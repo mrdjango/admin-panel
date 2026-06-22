@@ -49,6 +49,7 @@ import {
   adminVerify2FAFn,
   getStartupConfigFn,
   oauthExchangeFn,
+  oauthLoginFn,
   verifyAdminTokenFn,
 } from './auth';
 
@@ -225,6 +226,7 @@ describe('oauthExchangeFn', () => {
     expect(result).toEqual({
       error: false,
       user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      redirectTo: '/',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
@@ -243,6 +245,54 @@ describe('oauthExchangeFn', () => {
         codeVerifier: undefined,
       }),
     );
+  });
+
+  it('returns the post-login redirect captured at login start and clears it from the session', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123', postLoginRedirect: '/users' };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        expiresAt: 123456,
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    const result = await oauthExchangeFn({
+      data: { code: 'a'.repeat(64), provider: 'openid' },
+    });
+
+    expect(result).toMatchObject({ error: false, redirectTo: '/users' });
+    expect(updateSession).toHaveBeenCalledWith(
+      expect.objectContaining({ postLoginRedirect: undefined }),
+    );
+  });
+
+  it('sanitizes an unsafe stored redirect back to the dashboard', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123', postLoginRedirect: '//evil.com' };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        expiresAt: 123456,
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    const result = await oauthExchangeFn({
+      data: { code: 'a'.repeat(64), provider: 'openid' },
+    });
+
+    expect(result).toMatchObject({ error: false, redirectTo: '/' });
+  });
+
+  it('stores the sanitized post-login redirect in the session when starting login', async () => {
+    await oauthLoginFn({ data: { provider: 'google', redirectTo: '/access' } });
+    expect(updateSession).toHaveBeenCalledWith(
+      expect.objectContaining({ postLoginRedirect: '/access' }),
+    );
+
+    updateSession.mockClear();
+    await oauthLoginFn({ data: { provider: 'google', redirectTo: 'https://evil.com' } });
+    expect(updateSession).toHaveBeenCalledWith(expect.objectContaining({ postLoginRedirect: '/' }));
   });
 
   it('does not consume the one-time LibreChat exchange code when the PKCE verifier was lost', async () => {
@@ -324,6 +374,24 @@ describe('getStartupConfigFn', () => {
         openidLoginEnabled: true,
         googleLoginEnabled: true,
         socialLoginEnabled: false,
+      }),
+    );
+
+    const result = await getStartupConfigFn();
+
+    expect(result).toEqual({
+      providers: [{ id: 'openid', label: undefined, imageUrl: undefined }],
+      ssoOnly: false,
+    });
+  });
+
+  it('hides a provider omitted from the socialLogins allowlist even when enabled', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        openidLoginEnabled: true,
+        googleLoginEnabled: true,
+        socialLoginEnabled: true,
+        socialLogins: ['openid'],
       }),
     );
 
