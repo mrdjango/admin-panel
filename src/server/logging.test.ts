@@ -162,6 +162,21 @@ describe('reportOnBodyComplete', () => {
     expect(outcomes).toEqual(['stream-error']);
   });
 
+  it('reports once when a cancel races a pending read', async () => {
+    const outcomes: string[] = [];
+    /** Never enqueues, so the wrapper's read is still pending when the cancel lands. */
+    const body = new ReadableStream<Uint8Array>({ start() {} });
+
+    const res = reportOnBodyComplete(new Response(body, { status: 200 }), (o) => outcomes.push(o));
+    const reader = res.body!.getReader();
+    const pending = reader.read();
+    await reader.cancel('client gone');
+    await pending.catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(outcomes).toEqual(['stream-error']);
+  });
+
   it('preserves status and headers', () => {
     const res = reportOnBodyComplete(
       new Response('csv', { status: 200, headers: { 'content-type': 'text/csv' } }),

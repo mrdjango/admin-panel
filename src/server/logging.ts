@@ -105,6 +105,13 @@ export function reportOnBodyComplete(
     return res;
   }
 
+  let reported = false;
+  const reportOnce = (outcome: 'ok' | 'stream-error'): void => {
+    if (reported) return;
+    reported = true;
+    report(outcome);
+  };
+
   const source = res.body.getReader();
   const monitored = new ReadableStream<Uint8Array>({
     async pull(controller) {
@@ -112,17 +119,18 @@ export function reportOnBodyComplete(
         const { done, value } = await source.read();
         if (done) {
           controller.close();
-          report('ok');
+          reportOnce('ok');
           return;
         }
         controller.enqueue(value);
       } catch (err) {
         controller.error(err);
-        report('stream-error');
+        reportOnce('stream-error');
       }
     },
     cancel(reason) {
-      report('stream-error');
+      /** A cancel races any in-flight read, whose rejection would otherwise report a second time. */
+      reportOnce('stream-error');
       return source.cancel(reason);
     },
   });
