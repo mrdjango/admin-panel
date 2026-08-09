@@ -112,6 +112,7 @@ async function withHttpObservability(
   req: Request,
   pathname: string,
   getResponse: () => Response | Promise<Response>,
+  options?: { monitorBody?: boolean },
 ): Promise<Response> {
   const path = normalizeMetricsPath(pathname);
   const end = httpRequestDurationSeconds.startTimer({ method: req.method, path });
@@ -158,7 +159,10 @@ async function withHttpObservability(
 
   // Bun discards a HEAD body without reading or cancelling it, so a monitored
   // stream would never settle and the completion line would never be emitted.
-  if (req.method === 'HEAD') {
+  // A native file body must also be left intact: replacing it with a JavaScript
+  // stream costs Bun's sendfile path and the Content-Length it derives from the
+  // file, turning every static asset into a chunked transfer.
+  if (req.method === 'HEAD' || options?.monitorBody === false) {
     logDone(statusCode);
     return res;
   }
@@ -175,11 +179,16 @@ async function buildStaticRoutes(): Promise<Record<string, (req: Request) => Pro
     const cache = getCacheHeaders(path);
     const routePath = `${BASE_PATH}/${path}`;
     routes[routePath] = (req) =>
-      withHttpObservability(req, routePath, () => {
-        const res = new Response(file, { headers: { 'Content-Type': file.type, ...cache } });
-        applySecurityHeaders(res.headers);
-        return res;
-      });
+      withHttpObservability(
+        req,
+        routePath,
+        () => {
+          const res = new Response(file, { headers: { 'Content-Type': file.type, ...cache } });
+          applySecurityHeaders(res.headers);
+          return res;
+        },
+        { monitorBody: false },
+      );
   }
   return routes;
 }
