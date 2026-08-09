@@ -2,6 +2,7 @@ import { Glob } from 'bun';
 import { join } from 'node:path';
 import {
   isProbeRequest,
+  reportOnBodyComplete,
   createFloodGuard,
   formatLoggedPath,
   createMemoryWatermark,
@@ -120,7 +121,7 @@ async function withHttpObservability(
   let logCompletion = false;
   let startedAt = 0;
   let loggedPath = '';
-  if (REQUEST_LOG && !isProbeRequest(req.headers.get('user-agent'))) {
+  if (REQUEST_LOG && !isProbeRequest(req.headers.get('user-agent'), new URL(req.url).pathname)) {
     const { admitted, suppressedInPriorWindow } = floodGuard.admit(Date.now());
     if (suppressedInPriorWindow > 0) {
       console.log(`[req] suppressed ${suppressedInPriorWindow} requests in prior window`);
@@ -137,12 +138,13 @@ async function withHttpObservability(
   const statusCode = String(res.status);
   httpRequestsTotal.inc({ method: req.method, path, status_code: statusCode });
   end({ status_code: statusCode });
-  if (logCompletion) {
-    console.log(
-      `[req] ${req.method} ${loggedPath} ${statusCode} ${Math.round(performance.now() - startedAt)}ms`,
-    );
-  }
-  return res;
+  if (!logCompletion) return res;
+
+  return reportOnBodyComplete(res, (outcome) => {
+    const elapsed = Math.round(performance.now() - startedAt);
+    const suffix = outcome === 'stream-error' ? ' stream-error' : '';
+    console.log(`[req] ${req.method} ${loggedPath} ${statusCode} ${elapsed}ms${suffix}`);
+  });
 }
 
 async function buildStaticRoutes(): Promise<Record<string, (req: Request) => Promise<Response>>> {

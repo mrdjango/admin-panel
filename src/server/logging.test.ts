@@ -4,6 +4,7 @@ import {
   createFloodGuard,
   formatLoggedPath,
   createMemoryWatermark,
+  reportOnBodyComplete,
   parseMemoryThresholdsMb,
 } from './logging';
 
@@ -17,9 +18,16 @@ describe('isProbeRequest', () => {
     ['curl/8.7.1', false],
     ['', false],
     [null, false],
-  ])('user-agent %s -> %s', (userAgent, expected) => {
-    expect(isProbeRequest(userAgent)).toBe(expected);
+  ])('user-agent %s on the probe path -> %s', (userAgent, expected) => {
+    expect(isProbeRequest(userAgent, '/health')).toBe(expected);
   });
+
+  it.each(['/', '/api/config', '/admin/users'])(
+    'refuses to suppress %s even for a probe user-agent',
+    (pathname) => {
+      expect(isProbeRequest('kube-probe/1.29', pathname)).toBe(false);
+    },
+  );
 });
 
 describe('formatLoggedPath', () => {
@@ -85,6 +93,12 @@ describe('parseMemoryThresholdsMb', () => {
 });
 
 describe('createMemoryWatermark', () => {
+  it('reports the highest crossed threshold regardless of caller ordering', () => {
+    const watermark = createMemoryWatermark([448, 256, 384]);
+
+    expect(watermark.check(500 * MIB)).toBe(448);
+  });
+
   it('fires once per upward crossing and reports the highest threshold crossed', () => {
     const watermark = createMemoryWatermark([256, 384, 448]);
     expect(watermark.check(100 * MIB)).toBeNull();
@@ -106,5 +120,55 @@ describe('createMemoryWatermark', () => {
     expect(watermark.check(101 * MIB)).toBeNull();
     expect(watermark.check(102 * MIB)).toBeNull();
     expect(watermark.check(101 * MIB)).toBeNull();
+  });
+});
+
+describe('reportOnBodyComplete', () => {
+  it('reports immediately for a bodyless response', () => {
+    const outcomes: string[] = [];
+    const res = reportOnBodyComplete(new Response(null, { status: 204 }), (o) => outcomes.push(o));
+
+    expect(outcomes).toEqual(['ok']);
+    expect(res.status).toBe(204);
+  });
+
+  it('waits for the stream to drain before reporting success', async () => {
+    const outcomes: string[] = [];
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('chunk'));
+        controller.close();
+      },
+    });
+
+    const res = reportOnBodyComplete(new Response(body, { status: 200 }), (o) => outcomes.push(o));
+    expect(outcomes).toEqual([]);
+
+    await res.text();
+    expect(outcomes).toEqual(['ok']);
+  });
+
+  it('reports a stream error when the upstream body fails mid-transfer', async () => {
+    const outcomes: string[] = [];
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('partial'));
+        controller.error(new Error('upstream died'));
+      },
+    });
+
+    const res = reportOnBodyComplete(new Response(body, { status: 200 }), (o) => outcomes.push(o));
+    await expect(res.text()).rejects.toThrow();
+    expect(outcomes).toEqual(['stream-error']);
+  });
+
+  it('preserves status and headers', () => {
+    const res = reportOnBodyComplete(
+      new Response('csv', { status: 200, headers: { 'content-type': 'text/csv' } }),
+      () => {},
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/csv');
   });
 });

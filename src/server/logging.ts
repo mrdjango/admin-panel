@@ -1,11 +1,20 @@
+import type * as t from '@/types';
 const MAX_LOGGED_PATH_LENGTH = 200;
 const DEFAULT_MEMORY_THRESHOLDS_MB = [256, 384, 448];
 
 export const FLOOD_WINDOW_MS = 10_000;
 export const FLOOD_MAX_REQUESTS = 200;
 
-/** Kubelet health probes identify themselves via User-Agent; logging them would drown real traffic. */
-export function isProbeRequest(userAgent: string | null): boolean {
+/** Paths a kubelet probe is allowed to reach; anything else must stay loggable. */
+const PROBE_PATHS = new Set(['/health']);
+
+/**
+ * Kubelet health probes identify themselves via User-Agent, but that header is
+ * client-controlled, so the path is required too. Without it any request could
+ * claim to be a probe and suppress its own arrival and completion lines.
+ */
+export function isProbeRequest(userAgent: string | null, pathname: string): boolean {
+  if (!PROBE_PATHS.has(pathname)) return false;
   return userAgent !== null && userAgent.startsWith('kube-probe/');
 }
 
@@ -13,15 +22,6 @@ export function isProbeRequest(userAgent: string | null): boolean {
 export function formatLoggedPath(pathname: string): string {
   if (pathname.length <= MAX_LOGGED_PATH_LENGTH) return pathname;
   return `${pathname.slice(0, MAX_LOGGED_PATH_LENGTH)}...(truncated)`;
-}
-
-export interface FloodGuardDecision {
-  admitted: boolean;
-  suppressedInPriorWindow: number;
-}
-
-export interface FloodGuard {
-  admit: (nowMs: number) => FloodGuardDecision;
 }
 
 /**
@@ -32,13 +32,13 @@ export interface FloodGuard {
 export function createFloodGuard(
   maxRequests: number = FLOOD_MAX_REQUESTS,
   windowMs: number = FLOOD_WINDOW_MS,
-): FloodGuard {
+): t.FloodGuard {
   let windowStart = 0;
   let admittedInWindow = 0;
   let suppressedInWindow = 0;
 
   return {
-    admit(nowMs: number): FloodGuardDecision {
+    admit(nowMs: number): t.FloodGuardDecision {
       let suppressedInPriorWindow = 0;
       if (nowMs - windowStart >= windowMs) {
         suppressedInPriorWindow = suppressedInWindow;
@@ -66,11 +66,6 @@ export function parseMemoryThresholdsMb(raw: string | undefined): number[] {
   return [...parsed].sort((a, b) => a - b);
 }
 
-export interface MemoryWatermark {
-  /** Returns the highest threshold (in MiB) newly crossed upward, or null. */
-  check: (rssBytes: number) => number | null;
-}
-
 const BYTES_PER_MIB = 1024 * 1024;
 
 /**
@@ -78,7 +73,7 @@ const BYTES_PER_MIB = 1024 * 1024;
  * RSS drops back below it, so a sawtooth pattern logs each climb without
  * repeating on every tick spent above a threshold.
  */
-export function createMemoryWatermark(thresholdsMb: number[]): MemoryWatermark {
+export function createMemoryWatermark(thresholdsMb: number[]): t.MemoryWatermark {
   let lastRssMb = 0;
 
   return {
@@ -86,10 +81,55 @@ export function createMemoryWatermark(thresholdsMb: number[]): MemoryWatermark {
       const rssMb = rssBytes / BYTES_PER_MIB;
       let crossed: number | null = null;
       for (const threshold of thresholdsMb) {
-        if (lastRssMb < threshold && rssMb >= threshold) crossed = threshold;
+        if (lastRssMb >= threshold || rssMb < threshold) continue;
+        if (crossed === null || threshold > crossed) crossed = threshold;
       }
       lastRssMb = rssMb;
       return crossed;
     },
   };
+}
+
+/**
+ * Wraps a streaming body so completion is reported once the bytes are actually
+ * delivered. A handler that returns a `Response` built from an upstream stream
+ * resolves before transfer, so logging at that point would claim success for a
+ * transfer that can still fail mid-flight.
+ */
+export function reportOnBodyComplete(
+  res: Response,
+  report: (outcome: 'ok' | 'stream-error') => void,
+): Response {
+  if (res.body === null) {
+    report('ok');
+    return res;
+  }
+
+  const source = res.body.getReader();
+  const monitored = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await source.read();
+        if (done) {
+          controller.close();
+          report('ok');
+          return;
+        }
+        controller.enqueue(value);
+      } catch (err) {
+        controller.error(err);
+        report('stream-error');
+      }
+    },
+    cancel(reason) {
+      report('stream-error');
+      return source.cancel(reason);
+    },
+  });
+
+  return new Response(monitored, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: res.headers,
+  });
 }
