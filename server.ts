@@ -134,17 +134,38 @@ async function withHttpObservability(
     }
   }
 
-  const res = await getResponse();
+  const logDone = (status: string, note = ''): void => {
+    const elapsed = Math.round(performance.now() - startedAt);
+    console.log(`[req] ${req.method} ${loggedPath} ${status} ${elapsed}ms${note}`);
+  };
+
+  let res: Response;
+  try {
+    res = await getResponse();
+  } catch (err) {
+    // Bun's error callback turns this into a 500, but that line carries no method or
+    // path, so the arrival tombstone would otherwise never be closed out.
+    httpRequestsTotal.inc({ method: req.method, path, status_code: '500' });
+    end({ status_code: '500' });
+    if (logCompletion) logDone('500', ' handler-error');
+    throw err;
+  }
+
   const statusCode = String(res.status);
   httpRequestsTotal.inc({ method: req.method, path, status_code: statusCode });
   end({ status_code: statusCode });
   if (!logCompletion) return res;
 
-  return reportOnBodyComplete(res, (outcome) => {
-    const elapsed = Math.round(performance.now() - startedAt);
-    const suffix = outcome === 'stream-error' ? ' stream-error' : '';
-    console.log(`[req] ${req.method} ${loggedPath} ${statusCode} ${elapsed}ms${suffix}`);
-  });
+  // Bun discards a HEAD body without reading or cancelling it, so a monitored
+  // stream would never settle and the completion line would never be emitted.
+  if (req.method === 'HEAD') {
+    logDone(statusCode);
+    return res;
+  }
+
+  return reportOnBodyComplete(res, (outcome) =>
+    logDone(statusCode, outcome === 'stream-error' ? ' stream-error' : ''),
+  );
 }
 
 async function buildStaticRoutes(): Promise<Record<string, (req: Request) => Promise<Response>>> {
