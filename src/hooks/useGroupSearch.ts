@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type * as t from '@/types';
-import { groupsQueryOptions, GROUPS_PAGE_SIZE } from '@/server';
+import { groupsQueryOptions, GROUPS_PAGE_SIZE, MAX_SEARCH_LENGTH } from '@/server';
 import { useDebouncedFilter } from './useDebouncedFilter';
 
 /** Debounced server-side group search with offset pagination, so consumers
@@ -11,6 +11,11 @@ export function useGroupSearch(enabled = true): t.GroupSearch {
   const [page, setPage] = useState(1);
   const resetPage = useCallback(() => setPage(1), []);
   const { value, debouncedValue, onChange, reset: resetFilter } = useDebouncedFilter('', resetPage);
+
+  const onSearchChange = useCallback(
+    (next: string) => onChange(next.slice(0, MAX_SEARCH_LENGTH)),
+    [onChange],
+  );
 
   const reset = useCallback(() => {
     resetFilter();
@@ -26,7 +31,7 @@ export function useGroupSearch(enabled = true): t.GroupSearch {
   const total = data?.total ?? 0;
   return {
     search: value,
-    onSearchChange: onChange,
+    onSearchChange,
     reset,
     groups: data?.groups ?? [],
     total,

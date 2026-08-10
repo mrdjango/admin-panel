@@ -285,7 +285,11 @@ export function ScopeSelector({
         );
       }
       return (
-        <div className={cn(groupSearch.isFetching && 'opacity-60 transition-opacity')}>
+        <div
+          className={cn(
+            groupSearch.isFetching && 'pointer-events-none opacity-60 transition-opacity',
+          )}
+        >
           {groupSearch.groups.map((group) => {
             const configured = isGroupConfigured(group);
             return (
@@ -293,7 +297,7 @@ export function ScopeSelector({
                 key={group.id}
                 type="button"
                 onClick={() => handleCreateForGroup(group)}
-                disabled={creating || configured}
+                disabled={creating || configured || groupSearch.isFetching}
                 className={cn(
                   'scope-item w-full text-left',
                   creating && 'pointer-events-none opacity-50',

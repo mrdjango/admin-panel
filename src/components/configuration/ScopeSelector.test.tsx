@@ -1,11 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PrincipalType } from 'librechat-data-provider';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 const PAGE_SIZE = 50;
 const TOTAL_GROUPS = 60;
+
+/** When set, group list requests block until the promise resolves. */
+const mockListGate: { promise: Promise<void> | null } = { promise: null };
 
 const allGroups = Array.from({ length: TOTAL_GROUPS }, (_, i) => ({
   _id: `grp-${i + 1}`,
@@ -42,6 +45,7 @@ vi.mock('@/server/utils/api', () => ({
     if (url === '/api/admin/config') return json({ configs });
     if (url.startsWith('/api/admin/roles')) return json({ roles: [], total: 0 });
     if (url.startsWith('/api/admin/groups?')) {
+      if (mockListGate.promise) await mockListGate.promise;
       const params = new URLSearchParams(url.split('?')[1]);
       const search = params.get('search')?.toLowerCase() ?? '';
       const limit = Number(params.get('limit') ?? 200);
@@ -166,6 +170,10 @@ async function renderCreateView() {
   await screen.findByText('Group 01');
 }
 
+beforeEach(() => {
+  mockListGate.promise = null;
+});
+
 describe('ScopeSelector create view group pagination', () => {
   it('renders a fully configured page as disabled entries instead of a global empty state', async () => {
     await renderCreateView();
@@ -189,6 +197,31 @@ describe('ScopeSelector create view group pagination', () => {
     const eligibleButton = (await screen.findByText('Group 51')).closest('button');
     expect(eligibleButton).toBeEnabled();
     expect(screen.queryByText('com_scope_already_configured')).toBeNull();
+  });
+
+  it('disables stale rows while a new page or search is being fetched', async () => {
+    await renderCreateView();
+
+    fireEvent.click(screen.getByText('next-page'));
+    const eligibleButton = (await screen.findByText('Group 51')).closest('button');
+    expect(eligibleButton).toBeEnabled();
+
+    let release = () => {};
+    mockListGate.promise = new Promise((resolve) => {
+      release = resolve;
+    });
+    fireEvent.change(screen.getByLabelText('com_access_search_groups'), {
+      target: { value: 'Group 01' },
+    });
+
+    await waitFor(() => expect(screen.getByText('Group 51').closest('button')).toBeDisabled());
+
+    release();
+    mockListGate.promise = null;
+    await screen.findByText('Group 01');
+    expect(screen.queryByText('Group 51')).toBeNull();
+    expect(screen.getByText('Group 01').closest('button')).toBeDisabled();
+    expect(screen.getByText('com_scope_already_configured')).toBeInTheDocument();
   });
 
   it('reopening the create view after a search starts from page 1 unfiltered', async () => {

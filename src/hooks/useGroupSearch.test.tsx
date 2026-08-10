@@ -121,6 +121,8 @@ describe('useGroupSearch', () => {
 
     act(() => result.current.onSearchChange('x'.repeat(250)));
 
+    expect(result.current.search).toHaveLength(200);
+
     await waitFor(() => {
       const searchUrls = mockedApiFetch.mock.calls
         .map(([url]) => url)

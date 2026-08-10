@@ -48,7 +48,7 @@ const ALL_GROUPS_LIMIT = 200;
 const NAME_LOOKUP_BATCH_SIZE = 25;
 
 /** Backend rejects search strings longer than 200 characters with a 400. */
-const MAX_SEARCH_LENGTH = 200;
+export const MAX_SEARCH_LENGTH = 200;
 
 const GROUP_SOURCE_LOCAL = 'local' as const;
 
