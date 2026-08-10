@@ -10,6 +10,7 @@ import {
   tombstoneFieldProfileValueFn,
   bulkSaveProfileValuesFn,
   getBatchFieldProfilesFn,
+  getBaseConfigOverridesFn,
   availableScopesOptions,
   resetBaseConfigFieldFn,
   getResolvedConfigFn,
@@ -38,12 +39,14 @@ import {
   buildSavePayload,
   mergeIndexedArrayEdits,
   partitionScopeResetPaths,
+  executeEntryOverridesReset,
 } from './utils';
 import { validateMcpCrossField } from './sections/McpServersRenderer';
 import { ScopeSelector, ScopeTriggerButton } from './ScopeSelector';
 import { StickyActionBar } from '@/components/shared';
 import { ConfigTableOfContents } from './ConfigTableOfContents';
 import { ResetBaseConfigDialog } from './ResetBaseConfigDialog';
+import { ResetOverridesDialog } from './ResetOverridesDialog';
 import { ConfirmSaveDialog } from './ConfirmSaveDialog';
 import { ConfigTabContent } from './ConfigTabContent';
 import { ImportYamlDialog } from './ImportYamlDialog';
@@ -152,8 +155,37 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
     if (yamlMcpKeys && Array.isArray(yamlMcpKeys)) {
       result.mcpServers = new Set(yamlMcpKeys);
     }
+    const yamlCustomEndpointKeys = baseConfigData?.yamlCustomEndpointKeys;
+    if (yamlCustomEndpointKeys && Array.isArray(yamlCustomEndpointKeys)) {
+      result.endpoints = new Set(yamlCustomEndpointKeys);
+    }
     return result;
   }, [baseConfigData]);
+
+  /** Entry identities stored in the base override document, so the per-entry "reset to YAML" affordance only appears where overrides actually exist. */
+  const dbOverrideKeys = useMemo(() => {
+    const result: Record<string, Set<string>> = {};
+    if (!dbOverrides) return result;
+    const mcp = dbOverrides.mcpServers;
+    if (mcp && typeof mcp === 'object' && !Array.isArray(mcp)) {
+      result.mcpServers = new Set(Object.keys(mcp as Record<string, t.ConfigValue>));
+    }
+    const endpoints = dbOverrides.endpoints;
+    const custom =
+      endpoints && typeof endpoints === 'object' && !Array.isArray(endpoints)
+        ? (endpoints as Record<string, t.ConfigValue>).custom
+        : undefined;
+    if (Array.isArray(custom)) {
+      const names = new Set<string>();
+      for (const item of custom) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const name = (item as Record<string, t.ConfigValue>).name;
+        if (typeof name === 'string' && name) names.add(name);
+      }
+      result.endpoints = names;
+    }
+    return result;
+  }, [dbOverrides]);
 
   const hasUnmappedSections = useMemo(
     () =>
@@ -535,6 +567,37 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
       setEditedValues((prev) => ({ ...prev, [fieldPath]: undefined }));
     });
   }, []);
+
+  const [entryResetTarget, setEntryResetTarget] = useState<t.EntryResetTarget | null>(null);
+  const [entryResetting, setEntryResetting] = useState(false);
+  const [entryResetError, setEntryResetError] = useState<string | null>(null);
+
+  const handleEntryOverridesReset = useCallback((target: t.EntryResetTarget) => {
+    setEntryResetError(null);
+    setEntryResetTarget(target);
+  }, []);
+
+  const handleEntryResetConfirm = useCallback(async () => {
+    if (!entryResetTarget || entryResetting) return;
+    setEntryResetting(true);
+    setEntryResetError(null);
+    try {
+      await executeEntryOverridesReset(entryResetTarget, schemaPathSet, {
+        fetchOverrides: () => getBaseConfigOverridesFn().then((r) => r.overrides),
+        resetField: (fieldPath) => resetBaseConfigFieldFn({ data: { fieldPath } }),
+        saveEntries: (entries) => saveBaseConfigFn({ data: { entries } }),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['baseConfig'] });
+      setEntryResetting(false);
+      setEntryResetTarget(null);
+      notifySuccess(localize('com_config_reset_entry_success', { name: entryResetTarget.label }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setEntryResetting(false);
+      setEntryResetError(message);
+      notifyError(message);
+    }
+  }, [entryResetTarget, entryResetting, schemaPathSet, queryClient, localize]);
 
   const handleConfirmSave = useCallback(async () => {
     if (saving) return;
@@ -1006,6 +1069,8 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
               showConfiguredOnly={showConfiguredOnly}
               isEditingScope={isEditingScope}
               baseRecordKeys={baseRecordKeys}
+              dbOverrideKeys={isEditingScope ? undefined : dbOverrideKeys}
+              onResetEntryOverrides={isEditingScope ? undefined : handleEntryOverridesReset}
               onValidationError={(message) => notifyError(message)}
               editSessionId={editSessionId}
             />
@@ -1066,6 +1131,18 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
           if (resettingBase) return;
           setResetBaseOpen(false);
           setResetBaseError(null);
+        }}
+      />
+
+      <ResetOverridesDialog
+        target={entryResetTarget}
+        resetting={entryResetting}
+        error={entryResetError}
+        onConfirm={handleEntryResetConfirm}
+        onCancel={() => {
+          if (entryResetting) return;
+          setEntryResetTarget(null);
+          setEntryResetError(null);
         }}
       />
     </div>

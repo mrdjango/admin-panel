@@ -27,6 +27,83 @@ export function buildSavePayload(
   return { touched, saves, resets };
 }
 
+/**
+ * Builds the server calls that clear the admin-override layer for one entry,
+ * reverting it to the YAML config. Record entries (`mcpServers.<key>`) unset
+ * the whole override subtree. Array entries merged by name
+ * (`endpoints.custom` + `itemName`) rewrite the stored override array without
+ * the named item; when that item was the only one, the array path is unset
+ * instead so no empty override lingers.
+ */
+export function buildEntryOverridesResetPlan(
+  target: Pick<t.EntryResetTarget, 'fieldPath' | 'itemName'>,
+  dbOverrides: Record<string, t.ConfigValue> | undefined,
+  schemaPaths: ReadonlySet<string>,
+): t.EntryResetPlan {
+  if (target.itemName == null) {
+    return { resetPaths: [target.fieldPath], saves: [] };
+  }
+  const overrideArray = lookupPath(dbOverrides, target.fieldPath);
+  if (!Array.isArray(overrideArray)) {
+    return { resetPaths: [], saves: [] };
+  }
+  const remaining = overrideArray.filter((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return true;
+    return (item as Record<string, t.ConfigValue>).name !== target.itemName;
+  });
+  if (remaining.length === overrideArray.length) {
+    return { resetPaths: [], saves: [] };
+  }
+  if (remaining.length === 0) {
+    return { resetPaths: [target.fieldPath], saves: [] };
+  }
+  return {
+    resetPaths: [],
+    saves: [
+      {
+        fieldPath: target.fieldPath,
+        value: stripSecretPreviewValues(remaining, target.fieldPath, schemaPaths),
+      },
+    ],
+  };
+}
+
+/**
+ * Runs a per-entry overrides reset against a freshly fetched override
+ * document instead of the client cache. Another admin may have changed the
+ * override array since this page loaded, and rewriting it from a stale
+ * snapshot would silently discard their change (or resurrect a deleted
+ * item); fetching immediately before building the plan shrinks the
+ * read-modify-write window to the request itself. A target whose item no
+ * longer exists in the fresh document resolves as a no-op success.
+ */
+export async function executeEntryOverridesReset(
+  target: t.EntryResetTarget,
+  schemaPaths: ReadonlySet<string>,
+  deps: t.EntryResetDeps,
+): Promise<void> {
+  const overrides = await deps.fetchOverrides();
+  const plan = buildEntryOverridesResetPlan(target, overrides, schemaPaths);
+  if (plan.resetPaths.length > 0) {
+    await Promise.all(plan.resetPaths.map((fieldPath) => deps.resetField(fieldPath)));
+  }
+  if (plan.saves.length > 0) {
+    await deps.saveEntries(plan.saves);
+  }
+}
+
+function lookupPath(
+  obj: Record<string, t.ConfigValue> | undefined,
+  path: string,
+): t.ConfigValue | undefined {
+  let cursor: t.ConfigValue | undefined = obj;
+  for (const segment of path.split('.')) {
+    if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor)) return undefined;
+    cursor = (cursor as Record<string, t.ConfigValue>)[segment];
+  }
+  return cursor;
+}
+
 export function inferKVType(v: t.ConfigValue): t.KVValueType {
   if (typeof v === 'boolean') return 'boolean';
   if (typeof v === 'number') return 'number';

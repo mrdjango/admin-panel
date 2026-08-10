@@ -662,7 +662,9 @@ export function McpServersRenderer(props: t.FieldRendererProps) {
     disabled,
     editedValues,
     yamlBaseKeys,
+    dbOverrideKeys,
     isEditingScope,
+    onResetEntryOverrides,
     onValidationError,
   } = props;
   const localize = useLocalize();
@@ -785,6 +787,21 @@ export function McpServersRenderer(props: t.FieldRendererProps) {
   useEffect(() => {
     localizeRef.current = localize;
   }, [localize]);
+
+  const onResetEntryOverridesRef = useRef(onResetEntryOverrides);
+  useEffect(() => {
+    onResetEntryOverridesRef.current = onResetEntryOverrides;
+  }, [onResetEntryOverrides]);
+
+  const handleResetOverrides = useCallback(
+    (key: string) => {
+      onResetEntryOverridesRef.current?.({ fieldPath: `${path}.${key}`, label: key });
+    },
+    [path],
+  );
+
+  /** Immediate reset would interleave with staged edits, so it stays locked until they are saved or discarded (same rule as the global reset button). */
+  const hasPendingEdits = !!editedValues && Object.keys(editedValues).length > 0;
 
   const handleCreate = useCallback(
     (serverName: string, entry: Record<string, t.ConfigValue>) => {
@@ -942,9 +959,14 @@ export function McpServersRenderer(props: t.FieldRendererProps) {
           disabled={disabled}
           isEditingScope={!!isEditingScope}
           isYamlSource={yamlSourceKeys.has(key)}
+          canResetOverrides={
+            !isEditingScope && yamlSourceKeys.has(key) && (dbOverrideKeys?.has(key) ?? false)
+          }
+          resetDisabled={hasPendingEdits}
           onChange={onChange}
           onRemove={handleRemove}
           onRename={handleRename}
+          onResetOverrides={onResetEntryOverrides ? handleResetOverrides : undefined}
           justAdded={key === justAddedKey}
         />
       ))}
@@ -981,9 +1003,12 @@ const McpEntryRow = memo(function McpEntryRowImpl({
   disabled,
   isEditingScope,
   isYamlSource,
+  canResetOverrides,
+  resetDisabled,
   onChange,
   onRemove,
   onRename,
+  onResetOverrides,
   justAdded,
 }: {
   entryKey: string;
@@ -993,11 +1018,15 @@ const McpEntryRow = memo(function McpEntryRowImpl({
   disabled?: boolean;
   isEditingScope: boolean;
   isYamlSource: boolean;
+  canResetOverrides: boolean;
+  resetDisabled: boolean;
   onChange: (path: string, value: t.ConfigValue) => void;
   onRemove: (key: string) => void;
   onRename: (oldKey: string, newKey: string) => void;
+  onResetOverrides?: (key: string) => void;
   justAdded: boolean;
 }) {
+  const localize = useLocalize();
   const entryObj = isPlainObject(entryValue) ? entryValue : {};
   const rawType = typeof entryObj.type === 'string' ? entryObj.type : '';
   const inferred = rawType || inferTransportType(entryObj);
@@ -1043,6 +1072,15 @@ const McpEntryRow = memo(function McpEntryRowImpl({
     [onChange, entryPathBase, isDottedLegacy],
   );
 
+  const resetOverrides: t.EntryResetAction | undefined =
+    !isReadOnly && canResetOverrides && onResetOverrides
+      ? {
+          onClick: () => onResetOverrides(entryKey),
+          disabled: resetDisabled,
+          title: resetDisabled ? localize('com_config_reset_base_dirty') : undefined,
+        }
+      : undefined;
+
   return (
     <ObjectEntryCard
       id={`section-mcpServers-${encodeURIComponent(entryKey)}`}
@@ -1054,6 +1092,7 @@ const McpEntryRow = memo(function McpEntryRowImpl({
       onRename={
         isReadOnly || isLockedIdentity ? undefined : (renamed) => onRename(entryKey, renamed)
       }
+      resetOverrides={resetOverrides}
       disabled={isReadOnly}
       defaultExpanded={justAdded}
       renderFields={renderEntryFields}

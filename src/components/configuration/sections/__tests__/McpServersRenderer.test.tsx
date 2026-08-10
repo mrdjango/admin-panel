@@ -59,6 +59,7 @@ interface NumberFieldProps {
 interface IconButtonProps {
   icon: string;
   onClick?: () => void;
+  disabled?: boolean;
   'aria-label'?: string;
 }
 
@@ -89,9 +90,10 @@ vi.mock('@clickhouse/click-ui', () => ({
   Button: ({ label, onClick, children }: ButtonProps) => (
     <button onClick={onClick}>{label ?? children}</button>
   ),
-  IconButton: ({ icon, onClick, ...props }: IconButtonProps) => (
+  IconButton: ({ icon, onClick, disabled, ...props }: IconButtonProps) => (
     <button
       onClick={onClick}
+      disabled={disabled}
       aria-label={props['aria-label'] ?? icon}
       data-testid={`icon-button-${icon}`}
     />
@@ -173,16 +175,20 @@ function renderRenderer({
   editedValues = {},
   dbOverridePaths,
   yamlBaseKeys,
+  dbOverrideKeys,
   isEditingScope,
   onChange = vi.fn(),
+  onResetEntryOverrides,
   onValidationError = vi.fn(),
 }: {
   baseRecord: Record<string, t.ConfigValue>;
   editedValues?: t.FlatConfigMap;
   dbOverridePaths?: Set<string>;
   yamlBaseKeys?: Set<string>;
+  dbOverrideKeys?: Set<string>;
   isEditingScope?: boolean;
   onChange?: (path: string, value: t.ConfigValue) => void;
+  onResetEntryOverrides?: (target: t.EntryResetTarget) => void;
   onValidationError?: (message: string) => void;
 }) {
   const fields = fieldsForMcp();
@@ -199,7 +205,9 @@ function renderRenderer({
     editedValues,
     dbOverridePaths,
     yamlBaseKeys,
+    dbOverrideKeys,
     isEditingScope,
+    onResetEntryOverrides,
     onValidationError,
   };
   return {
@@ -341,6 +349,85 @@ describe('McpServersRenderer — YAML source detection', () => {
     expect(url!.hasAttribute('disabled')).toBe(false);
     expect(container.querySelector('button[aria-label^="com_ui_delete"]')).not.toBeNull();
     expect(container.querySelector('button[aria-label^="com_a11y_rename_entry"]')).not.toBeNull();
+  });
+});
+
+describe('McpServersRenderer — per-entry clear overrides (issue #73)', () => {
+  it('shows a reset-to-YAML action on a YAML server with DB overrides and reports the entry target', () => {
+    const onResetEntryOverrides = vi.fn();
+    const baseRecord = {
+      kapa: { type: 'sse', url: 'https://example.com', title: 'Overridden title' },
+    };
+    const { container } = renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set(['kapa']),
+      dbOverrideKeys: new Set(['kapa']),
+      onResetEntryOverrides,
+    });
+
+    expect(container.querySelector('button[aria-label^="com_ui_delete"]')).toBeNull();
+    const resetBtn = screen.getByTestId('icon-button-refresh');
+    fireEvent.click(resetBtn);
+    expect(onResetEntryOverrides).toHaveBeenCalledWith({
+      fieldPath: 'mcpServers.kapa',
+      label: 'kapa',
+    });
+  });
+
+  it('hides the reset action when the YAML server has no DB overrides', () => {
+    const baseRecord = {
+      kapa: { type: 'sse', url: 'https://example.com' },
+    };
+    renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set(['kapa']),
+      dbOverrideKeys: new Set<string>(),
+      onResetEntryOverrides: vi.fn(),
+    });
+    expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
+  });
+
+  it('hides the reset action for admin-only servers (they have delete instead)', () => {
+    const baseRecord = {
+      adminOnly: { type: 'sse', url: 'https://admin.example.com' },
+    };
+    const { container } = renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set<string>(),
+      dbOverrideKeys: new Set(['adminOnly']),
+      onResetEntryOverrides: vi.fn(),
+    });
+    expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
+    expect(container.querySelector('button[aria-label^="com_ui_delete"]')).not.toBeNull();
+  });
+
+  it('hides the reset action in scope mode (scope overrides are not the base override layer)', () => {
+    const baseRecord = {
+      kapa: { type: 'sse', url: 'https://example.com' },
+    };
+    renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set(['kapa']),
+      dbOverrideKeys: new Set(['kapa']),
+      isEditingScope: true,
+      onResetEntryOverrides: vi.fn(),
+    });
+    expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
+  });
+
+  it('disables the reset action while edits are pending', () => {
+    const baseRecord = {
+      kapa: { type: 'sse', url: 'https://example.com' },
+    };
+    renderRenderer({
+      baseRecord,
+      editedValues: { 'mcpServers.kapa.title': 'staged' },
+      yamlBaseKeys: new Set(['kapa']),
+      dbOverrideKeys: new Set(['kapa']),
+      onResetEntryOverrides: vi.fn(),
+    });
+    const resetBtn = screen.getByTestId('icon-button-refresh');
+    expect(resetBtn.hasAttribute('disabled')).toBe(true);
   });
 });
 
