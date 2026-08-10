@@ -1,5 +1,10 @@
 import type * as t from '@/types';
-import { deepSerializeKVPairs, secretPathForPreviewPath, stripSecretPreviewValues } from '@/utils';
+import {
+  deepSerializeKVPairs,
+  secretPathForPreviewPath,
+  stripSecretPreviewValues,
+  serializeKVPairs,
+} from '@/utils';
 
 const INDEXED_ARRAY_PATH_RE = /^(.+)\.(\d+)$/;
 
@@ -43,6 +48,16 @@ export function inferKVType(v: t.ConfigValue): t.KVValueType {
  */
 export function kvPairsEditValue(pairs: t.KeyValuePair[]): t.ConfigValue {
   return pairs.length === 0 ? {} : pairs;
+}
+
+/**
+ * Serializes a profile modal value for save. Only record controls edit via
+ * KeyValueField pairs; every other control type must pass through untouched
+ * so array values whose elements merely look pair-like (objects carrying
+ * `key` and `value` properties) are never collapsed into records.
+ */
+export function serializeModalValue(controlType: t.ControlType, value: t.ConfigValue): t.ConfigValue {
+  return controlType === 'record' ? serializeKVPairs(value) : value;
 }
 
 export function toKVPair(k: string, v: t.ConfigValue): t.KeyValuePair {

@@ -10,6 +10,7 @@ import {
   buildSavePayload,
   applyConfigEdit,
   kvPairsEditValue,
+  serializeModalValue,
 } from './utils';
 import { createField } from '@/test/fixtures';
 import { flattenObject } from '@/utils';
@@ -589,5 +590,22 @@ describe('buildSavePayload — KV pairs serialize to records', () => {
         value: { group: 'my-group', addParams: { reasoning_effort: 'high' } },
       },
     ]);
+  });
+});
+
+describe('serializeModalValue', () => {
+  it('serializes record-control pairs to a plain record', () => {
+    const pairs = [{ key: 'Authorization', value: 'Bearer {{API_KEY}}', valueType: 'string' }];
+    expect(serializeModalValue('record', pairs)).toEqual({ Authorization: 'Bearer {{API_KEY}}' });
+  });
+
+  it('passes an untouched empty record default through unchanged', () => {
+    expect(serializeModalValue('record', {})).toEqual({});
+  });
+
+  it('leaves array-control values untouched even when elements look pair-like', () => {
+    const value = [{ key: 'id', value: 'x', enabled: true }];
+    expect(serializeModalValue('array', value)).toBe(value);
+    expect(serializeModalValue('array-object', value)).toBe(value);
   });
 });
