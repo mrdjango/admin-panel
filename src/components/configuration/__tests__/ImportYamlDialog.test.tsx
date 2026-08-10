@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { parseImportedYaml } from '@/server';
-import { ImportYamlDialog } from './ImportYamlDialog';
+import { ImportYamlDialog } from '../ImportYamlDialog';
 
 vi.mock('@/hooks/useLocalize', () => {
   const localize = (key: string, options?: Record<string, string | number>) =>

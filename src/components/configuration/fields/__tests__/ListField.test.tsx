@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ListField } from './ListField';
+import { ListField } from '../ListField';
 
 vi.mock('@/hooks/useLocalize', () => ({
   default: () => (key: string) => key,
@@ -93,6 +93,39 @@ describe('ListField with enum options', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'com_ui_delete com_ui_item 1' }));
     expect(onChange).toHaveBeenCalledWith(['capability_from_newer_librechat']);
+  });
+
+  it('shows Add when a known option remains unselected despite an unknown value', () => {
+    const onChange = vi.fn();
+    render(
+      <ListField
+        id="capabilities"
+        values={['capability_from_newer_librechat', 'execute_code', 'web_search']}
+        onChange={onChange}
+        options={capabilityOptions}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'com_ui_add_item' }));
+    expect(onChange).toHaveBeenCalledWith([
+      'capability_from_newer_librechat',
+      'execute_code',
+      'web_search',
+      'tools',
+    ]);
+  });
+
+  it('hides Add when every known option is selected alongside an unknown value', () => {
+    render(
+      <ListField
+        id="capabilities"
+        values={['capability_from_newer_librechat', 'execute_code', 'web_search', 'tools']}
+        onChange={vi.fn()}
+        options={capabilityOptions}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'com_ui_add_item' })).not.toBeInTheDocument();
   });
 
   it('shows the unknown value as plain text when disabled', () => {
