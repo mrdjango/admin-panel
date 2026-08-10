@@ -39,6 +39,7 @@ import {
   buildSavePayload,
   mergeIndexedArrayEdits,
   partitionScopeResetPaths,
+  collectEntryOverrideKeys,
   executeEntryOverridesReset,
 } from './utils';
 import { validateMcpCrossField } from './sections/McpServersRenderer';
@@ -162,30 +163,7 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
     return result;
   }, [baseConfigData]);
 
-  /** Entry identities stored in the base override document, so the per-entry "reset to YAML" affordance only appears where overrides actually exist. */
-  const dbOverrideKeys = useMemo(() => {
-    const result: Record<string, Set<string>> = {};
-    if (!dbOverrides) return result;
-    const mcp = dbOverrides.mcpServers;
-    if (mcp && typeof mcp === 'object' && !Array.isArray(mcp)) {
-      result.mcpServers = new Set(Object.keys(mcp as Record<string, t.ConfigValue>));
-    }
-    const endpoints = dbOverrides.endpoints;
-    const custom =
-      endpoints && typeof endpoints === 'object' && !Array.isArray(endpoints)
-        ? (endpoints as Record<string, t.ConfigValue>).custom
-        : undefined;
-    if (Array.isArray(custom)) {
-      const names = new Set<string>();
-      for (const item of custom) {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-        const name = (item as Record<string, t.ConfigValue>).name;
-        if (typeof name === 'string' && name) names.add(name);
-      }
-      result.endpoints = names;
-    }
-    return result;
-  }, [dbOverrides]);
+  const dbOverrideKeys = useMemo(() => collectEntryOverrideKeys(dbOverrides), [dbOverrides]);
 
   const hasUnmappedSections = useMemo(
     () =>
@@ -588,6 +566,8 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
         saveEntries: (entries) => saveBaseConfigFn({ data: { entries } }),
       });
       await queryClient.invalidateQueries({ queryKey: ['baseConfig'] });
+      /** Remount session-keyed field state (e.g. a SecretField opened for Replace but left untouched, which no invalidation reaches) so nothing local survives past the reset. */
+      setEditSessionId((id) => id + 1);
       setEntryResetting(false);
       setEntryResetTarget(null);
       notifySuccess(localize('com_config_reset_entry_success', { name: entryResetTarget.label }));

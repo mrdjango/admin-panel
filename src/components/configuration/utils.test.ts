@@ -11,6 +11,7 @@ import {
   applyConfigEdit,
   buildEntryOverridesResetPlan,
   executeEntryOverridesReset,
+  collectEntryOverrideKeys,
 } from './utils';
 import { createField } from '@/test/fixtures';
 import { flattenObject } from '@/utils';
@@ -725,5 +726,88 @@ describe('executeEntryOverridesReset — builds the rewrite from a fresh overrid
 
     expect(resetField).toHaveBeenCalledWith('mcpServers.kapa');
     expect(saveEntries).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildEntryOverridesResetPlan — legacy numeric-key object storage', () => {
+  const schemaPaths = new Set(['endpoints.custom.apiKey', 'endpoints.custom.name']);
+
+  /** Panels prior to #92 PATCHed indexed field paths (endpoints.custom.2) directly; Mongo's $set on a missing parent stores those as a numeric-key object rather than an array. */
+  it('rewrites a numeric-key object override as a dense array without the named item', () => {
+    const dbOverrides = {
+      endpoints: {
+        custom: {
+          '0': { name: 'yamlEp', baseURL: 'https://overridden.example' },
+          '2': { name: 'adminEp', baseURL: 'https://admin.example' },
+        },
+      },
+    };
+    expect(
+      buildEntryOverridesResetPlan(
+        { fieldPath: 'endpoints.custom', itemName: 'yamlEp' },
+        dbOverrides,
+        schemaPaths,
+      ),
+    ).toEqual({
+      resetPaths: [],
+      saves: [
+        {
+          fieldPath: 'endpoints.custom',
+          value: [{ name: 'adminEp', baseURL: 'https://admin.example' }],
+        },
+      ],
+    });
+  });
+
+  it('resets the array path when the numeric-key object held only the named item', () => {
+    const dbOverrides = {
+      endpoints: { custom: { '1': { name: 'yamlEp', baseURL: 'https://overridden.example' } } },
+    };
+    expect(
+      buildEntryOverridesResetPlan(
+        { fieldPath: 'endpoints.custom', itemName: 'yamlEp' },
+        dbOverrides,
+        schemaPaths,
+      ),
+    ).toEqual({ resetPaths: ['endpoints.custom'], saves: [] });
+  });
+
+  it('is a no-op for an object whose keys are not array indices', () => {
+    const dbOverrides = {
+      endpoints: { custom: { yamlEp: { name: 'yamlEp' } } },
+    };
+    expect(
+      buildEntryOverridesResetPlan(
+        { fieldPath: 'endpoints.custom', itemName: 'yamlEp' },
+        dbOverrides,
+        schemaPaths,
+      ),
+    ).toEqual({ resetPaths: [], saves: [] });
+  });
+});
+
+describe('collectEntryOverrideKeys', () => {
+  it('collects MCP record keys and endpoint names from an array override', () => {
+    const dbOverrides = {
+      mcpServers: { kapa: { title: 'X' }, other: { timeout: 1 } },
+      endpoints: { custom: [{ name: 'yamlEp' }, { name: 'adminEp' }, { baseURL: 'nameless' }] },
+    };
+    expect(collectEntryOverrideKeys(dbOverrides)).toEqual({
+      mcpServers: new Set(['kapa', 'other']),
+      endpoints: new Set(['yamlEp', 'adminEp']),
+    });
+  });
+
+  it('collects endpoint names from a legacy numeric-key object override', () => {
+    const dbOverrides = {
+      endpoints: { custom: { '0': { name: 'yamlEp' }, '3': { name: 'adminEp' } } },
+    };
+    expect(collectEntryOverrideKeys(dbOverrides)).toEqual({
+      endpoints: new Set(['yamlEp', 'adminEp']),
+    });
+  });
+
+  it('returns an empty map when there is no override document', () => {
+    expect(collectEntryOverrideKeys(undefined)).toEqual({});
   });
 });

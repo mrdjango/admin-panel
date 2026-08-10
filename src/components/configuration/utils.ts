@@ -43,8 +43,8 @@ export function buildEntryOverridesResetPlan(
   if (target.itemName == null) {
     return { resetPaths: [target.fieldPath], saves: [] };
   }
-  const overrideArray = lookupPath(dbOverrides, target.fieldPath);
-  if (!Array.isArray(overrideArray)) {
+  const overrideArray = toOverrideArraySource(lookupPath(dbOverrides, target.fieldPath));
+  if (!overrideArray) {
     return { resetPaths: [], saves: [] };
   }
   const remaining = overrideArray.filter((item) => {
@@ -66,6 +66,55 @@ export function buildEntryOverridesResetPlan(
       },
     ],
   };
+}
+
+const ARRAY_INDEX_KEY_RE = /^(0|[1-9]\d*)$/;
+
+/**
+ * Normalizes a stored array override into a dense array. Panels prior to #92
+ * PATCHed indexed field paths (`endpoints.custom.2`) directly, and Mongo's
+ * `$set` on a missing parent materializes those as a numeric-key object
+ * (`{ '0': {...}, '2': {...} }`) rather than an array, so legacy override
+ * documents can hold either shape. Holes from sparse indices are dropped.
+ */
+export function toOverrideArraySource(value: t.ConfigValue | undefined): t.ConfigValue[] | null {
+  if (Array.isArray(value)) return [...value];
+  if (!value || typeof value !== 'object') return null;
+  const sparse: t.ConfigValue[] = [];
+  for (const [key, entry] of Object.entries(value as Record<string, t.ConfigValue>)) {
+    if (!ARRAY_INDEX_KEY_RE.test(key)) return null;
+    sparse[Number(key)] = entry;
+  }
+  return sparse.filter((entry) => entry !== undefined);
+}
+
+/**
+ * Derives the entry identities stored in the base override document, keyed by
+ * section, so per-entry "reset to YAML" affordances only appear where
+ * overrides actually exist. MCP servers key by record key; custom endpoints
+ * key by item `name` (the merge identity), accepting both the array and
+ * legacy numeric-key object storage shapes.
+ */
+export function collectEntryOverrideKeys(
+  dbOverrides: Record<string, t.ConfigValue> | undefined,
+): Record<string, Set<string>> {
+  const result: Record<string, Set<string>> = {};
+  if (!dbOverrides) return result;
+  const mcp = dbOverrides.mcpServers;
+  if (mcp && typeof mcp === 'object' && !Array.isArray(mcp)) {
+    result.mcpServers = new Set(Object.keys(mcp as Record<string, t.ConfigValue>));
+  }
+  const custom = toOverrideArraySource(lookupPath(dbOverrides, 'endpoints.custom'));
+  if (custom) {
+    const names = new Set<string>();
+    for (const item of custom) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const name = (item as Record<string, t.ConfigValue>).name;
+      if (typeof name === 'string' && name) names.add(name);
+    }
+    result.endpoints = names;
+  }
+  return result;
 }
 
 /**
