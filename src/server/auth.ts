@@ -21,17 +21,29 @@ function extractCookieValue(response: Response, name: string): string | undefine
   return undefined;
 }
 
+/** Returns the referer's origin only when its host matches the serving host, so a foreign referer (e.g. an IdP such as Azure EntraID's login.microsoftonline.com) can never be forwarded as the panel's own origin. */
+function getSameHostRefererOrigin(host: string): string | undefined {
+  const referer = getRequestHeader('referer');
+  if (!referer) return undefined;
+  try {
+    const url = new URL(referer);
+    return url.host.toLowerCase() === host.toLowerCase() ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * Resolves the admin panel's own origin for LibreChat's exchange-code origin binding.
+ * Resolves the admin panel's browser-visible origin for LibreChat's exchange-code
+ * origin binding.
  *
- * Never derived from the `referer` header: when a proxy or client drops the `Origin`
- * header, the referer identifies whatever page or IdP initiated the request (e.g.
- * Azure EntraID's login.microsoftonline.com on an IdP-initiated callback), not the
- * panel itself. Forwarding a foreign origin makes LibreChat reject the exchange code
- * as expired even though authentication succeeded. The panel's browser-visible origin
- * is derived from forwarding metadata instead: the first `x-forwarded-host` value wins
- * over `host` because Host-rewriting proxies replace `host` with the internal upstream
- * authority, then the first `x-forwarded-proto` value supplies the scheme.
+ * Order: the `origin` header, then the first `x-forwarded-host` value (Host-rewriting
+ * proxies replace `host` with the internal upstream authority) combined with the first
+ * `x-forwarded-proto` value. When no forwarded proto is available, a same-host referer
+ * recovers the scheme for HTTPS deployments whose proxy strips `Origin` without setting
+ * `x-forwarded-proto`. A foreign referer is never used: it identifies whatever page or
+ * IdP initiated the request, and forwarding it makes LibreChat reject the exchange code
+ * as expired even though authentication succeeded.
  */
 function getRequestOrigin(): string | undefined {
   const origin = getRequestHeader('origin');
@@ -42,8 +54,10 @@ function getRequestOrigin(): string | undefined {
   if (!host) return undefined;
 
   const forwardedProto = getRequestHeader('x-forwarded-proto');
-  const proto = forwardedProto?.split(',')[0]?.trim() || 'http';
-  return `${proto}://${host}`;
+  const proto = forwardedProto?.split(',')[0]?.trim();
+  if (proto) return `${proto}://${host}`;
+
+  return getSameHostRefererOrigin(host) ?? `http://${host}`;
 }
 
 export const adminLoginFn = createServerFn({ method: 'POST' })

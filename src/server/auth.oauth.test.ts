@@ -342,6 +342,52 @@ describe('oauthExchangeFn', () => {
     });
   });
 
+  it('recovers the https scheme from a same-host referer when x-forwarded-proto is absent', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'example.com');
+    requestHeaders.set('referer', 'https://example.com/admin/auth/openid/callback?code=abc');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '1'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: '1'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
+  it('never adopts a foreign referer origin even when x-forwarded-proto is absent', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'example.com');
+    requestHeaders.set('referer', 'https://login.microsoftonline.com/');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '2'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://example.com',
+      },
+      body: JSON.stringify({ code: '2'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
   it('does not consume the one-time LibreChat exchange code when the PKCE verifier was lost', async () => {
     sessionState.data = {};
 
