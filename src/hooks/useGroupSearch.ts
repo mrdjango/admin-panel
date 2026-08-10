@@ -40,5 +40,6 @@ export function useGroupSearch(enabled = true): t.GroupSearch {
     setPage,
     isLoading,
     isFetching,
+    isSearchPending: value !== debouncedValue,
   };
 }

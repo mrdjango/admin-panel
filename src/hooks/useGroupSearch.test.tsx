@@ -159,6 +159,18 @@ describe('useGroupSearch', () => {
     expect(staleUrls).toEqual([]);
   });
 
+  it('reports a pending search until the debounce commits', async () => {
+    const { result } = renderHook(() => useGroupSearch(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.isSearchPending).toBe(false);
+
+    act(() => result.current.onSearchChange('Needle'));
+    expect(result.current.isSearchPending).toBe(true);
+
+    await waitFor(() => expect(result.current.isSearchPending).toBe(false));
+    expect(result.current.total).toBe(1);
+  });
+
   it('does not fetch until enabled', async () => {
     const { result, rerender } = renderHook(({ enabled }) => useGroupSearch(enabled), {
       wrapper: createWrapper(),

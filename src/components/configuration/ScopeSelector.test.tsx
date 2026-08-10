@@ -224,6 +224,20 @@ describe('ScopeSelector create view group pagination', () => {
     expect(screen.getByText('com_scope_already_configured')).toBeInTheDocument();
   });
 
+  it('disables rows during the debounce window before the search request starts', async () => {
+    await renderCreateView();
+
+    fireEvent.click(screen.getByText('next-page'));
+    const eligibleButton = (await screen.findByText('Group 51')).closest('button');
+    expect(eligibleButton).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText('com_access_search_groups'), {
+      target: { value: 'Needle' },
+    });
+
+    expect(screen.getByText('Group 51').closest('button')).toBeDisabled();
+  });
+
   it('reopening the create view after a search starts from page 1 unfiltered', async () => {
     await renderCreateView();
 
