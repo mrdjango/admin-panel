@@ -28,14 +28,17 @@ function extractCookieValue(response: Response, name: string): string | undefine
  * header, the referer identifies whatever page or IdP initiated the request (e.g.
  * Azure EntraID's login.microsoftonline.com on an IdP-initiated callback), not the
  * panel itself. Forwarding a foreign origin makes LibreChat reject the exchange code
- * as expired even though authentication succeeded. The panel's own serving origin is
- * always derivable from `host` plus the first `x-forwarded-proto` value.
+ * as expired even though authentication succeeded. The panel's browser-visible origin
+ * is derived from forwarding metadata instead: the first `x-forwarded-host` value wins
+ * over `host` because Host-rewriting proxies replace `host` with the internal upstream
+ * authority, then the first `x-forwarded-proto` value supplies the scheme.
  */
 function getRequestOrigin(): string | undefined {
   const origin = getRequestHeader('origin');
   if (origin) return origin;
 
-  const host = getRequestHeader('host');
+  const forwardedHost = getRequestHeader('x-forwarded-host');
+  const host = forwardedHost?.split(',')[0]?.trim() || getRequestHeader('host');
   if (!host) return undefined;
 
   const forwardedProto = getRequestHeader('x-forwarded-proto');

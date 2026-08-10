@@ -294,6 +294,54 @@ describe('oauthExchangeFn', () => {
     });
   });
 
+  it('prefers x-forwarded-host over a proxy-rewritten upstream host', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'admin-panel:3000');
+    requestHeaders.set('x-forwarded-host', 'example.com');
+    requestHeaders.set('x-forwarded-proto', 'https');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: 'e'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: 'e'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
+  it('uses the first x-forwarded-host value when the proxy chain appends multiple', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'admin-panel:3000');
+    requestHeaders.set('x-forwarded-host', 'example.com, internal-lb.local');
+    requestHeaders.set('x-forwarded-proto', 'https');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: 'f'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: 'f'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
   it('does not consume the one-time LibreChat exchange code when the PKCE verifier was lost', async () => {
     sessionState.data = {};
 
