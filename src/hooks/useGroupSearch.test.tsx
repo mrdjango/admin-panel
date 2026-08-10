@@ -115,6 +115,23 @@ describe('useGroupSearch', () => {
     ]);
   });
 
+  it('truncates search strings to the backend limit instead of triggering a 400', async () => {
+    const { result } = renderHook(() => useGroupSearch(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.onSearchChange('x'.repeat(250)));
+
+    await waitFor(() => {
+      const searchUrls = mockedApiFetch.mock.calls
+        .map(([url]) => url)
+        .filter((url) => url.includes('search='));
+      expect(searchUrls).toHaveLength(1);
+    });
+    const url = mockedApiFetch.mock.calls.map(([u]) => u).find((u) => u.includes('search='));
+    const sent = new URLSearchParams(url?.split('?')[1] ?? '').get('search') ?? '';
+    expect(sent).toHaveLength(200);
+  });
+
   it('does not fetch until enabled', async () => {
     const { result, rerender } = renderHook(({ enabled }) => useGroupSearch(enabled), {
       wrapper: createWrapper(),

@@ -47,6 +47,9 @@ const ALL_GROUPS_LIMIT = 200;
 
 const NAME_LOOKUP_BATCH_SIZE = 25;
 
+/** Backend rejects search strings longer than 200 characters with a 400. */
+const MAX_SEARCH_LENGTH = 200;
+
 const GROUP_SOURCE_LOCAL = 'local' as const;
 
 // ── Server functions ─────────────────────────────────────────────────
@@ -66,7 +69,7 @@ export const getGroupsFn = createServerFn({ method: 'GET' })
       data: { search?: string; limit?: number; offset?: number };
     }): Promise<{ groups: AdminGroup[]; total: number }> => {
       const params = new URLSearchParams();
-      if (data.search) params.set('search', data.search);
+      if (data.search) params.set('search', data.search.slice(0, MAX_SEARCH_LENGTH));
       if (data.limit != null) params.set('limit', String(data.limit));
       if (data.offset != null) params.set('offset', String(data.offset));
       const qs = params.toString();
