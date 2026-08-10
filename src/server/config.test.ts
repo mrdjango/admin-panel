@@ -1352,6 +1352,7 @@ ${capabilities.map((c) => `      - '${c}'`).join('\n')}
     const result = parseYamlConfig(issue72Yaml);
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
+    expect(result.preservedValues).toBeUndefined();
     expect(capabilitiesOf(result.appConfig)).toEqual(issue72Capabilities);
   });
 
@@ -1367,6 +1368,15 @@ ${capabilities.map((c) => `      - '${c}'`).join('\n')}
     ]);
   });
 
+  it('reports which values were preserved so the UI can surface them', () => {
+    const result = parseYamlConfig(
+      yamlWithCapabilities(['execute_code', 'capability_from_newer_librechat', 'web_search']),
+    );
+    expect(result.preservedValues).toEqual([
+      { path: 'endpoints.agents.capabilities.1', value: 'capability_from_newer_librechat' },
+    ]);
+  });
+
   it('preserves multiple unknown enum values at their original positions', () => {
     const result = parseYamlConfig(
       yamlWithCapabilities(['future_first', 'tools', 'future_mid', 'ocr', 'future_last']),
@@ -1377,6 +1387,11 @@ ${capabilities.map((c) => `      - '${c}'`).join('\n')}
       'tools',
       'future_mid',
       'ocr',
+      'future_last',
+    ]);
+    expect(result.preservedValues?.map((p) => p.value)).toEqual([
+      'future_first',
+      'future_mid',
       'future_last',
     ]);
   });

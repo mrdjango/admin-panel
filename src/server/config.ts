@@ -760,7 +760,8 @@ function preserveUnknownEnumValues(
 export function parseYamlConfig(yamlContent: string): {
   success: boolean;
   error: string | undefined;
-  validationErrors: Array<{ path: string; message: string }> | undefined;
+  validationErrors: t.ImportValidationError[] | undefined;
+  preservedValues: t.ImportPreservedValue[] | undefined;
   appConfig: Record<string, t.ConfigValue> | null;
 } {
   let rawConfig: unknown;
@@ -772,6 +773,7 @@ export function parseYamlConfig(yamlContent: string): {
       success: false,
       error: 'Invalid YAML syntax. Please check the content for syntax errors.',
       validationErrors: undefined,
+      preservedValues: undefined,
       appConfig: null,
     };
   }
@@ -781,6 +783,7 @@ export function parseYamlConfig(yamlContent: string): {
       success: false,
       error: 'YAML did not produce a valid configuration object',
       validationErrors: undefined,
+      preservedValues: undefined,
       appConfig: null,
     };
   }
@@ -794,7 +797,16 @@ export function parseYamlConfig(yamlContent: string): {
     if (blocking.length === 0) {
       const appConfig = preserveUnknownEnumValues(rawConfig as Record<string, unknown>, issues);
       if (appConfig) {
-        return { success: true, error: undefined, validationErrors: undefined, appConfig };
+        return {
+          success: true,
+          error: undefined,
+          validationErrors: undefined,
+          preservedValues: issues.map((i) => ({
+            path: i.path.join('.'),
+            value: i.received as string,
+          })),
+          appConfig,
+        };
       }
     }
 
@@ -805,6 +817,7 @@ export function parseYamlConfig(yamlContent: string): {
         path: e.path.join('.'),
         message: e.message,
       })),
+      preservedValues: undefined,
       appConfig: null,
     };
   }
@@ -824,6 +837,7 @@ export function parseYamlConfig(yamlContent: string): {
     success: true,
     error: undefined,
     validationErrors: undefined,
+    preservedValues: undefined,
     appConfig: result.data as Record<string, t.ConfigValue>,
   };
 }

@@ -30,6 +30,7 @@ export function ListField({
 
   const resolvedPlaceholder = placeholder ?? localize('com_ui_enter_value');
   const resolvedItemLabel = itemLabel ?? localize('com_ui_item');
+  const knownOptionValues = options ? new Set(options.map((o) => o.value)) : null;
 
   const handleAdd = () => {
     if (options) {
@@ -76,6 +77,7 @@ export function ListField({
                 aria-label={itemLabel}
                 className="config-input flex-1"
               >
+                {!knownOptionValues?.has(value) && <option value={value}>{value}</option>}
                 {options.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
