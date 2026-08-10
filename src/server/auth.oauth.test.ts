@@ -197,6 +197,8 @@ describe('verifyAdminTokenFn', () => {
 });
 
 describe('oauthExchangeFn', () => {
+  const originalPublicUrl = process.env.ADMIN_PANEL_PUBLIC_URL;
+
   beforeEach(() => {
     fetchMock.mockReset();
     updateSession.mockReset();
@@ -204,6 +206,66 @@ describe('oauthExchangeFn', () => {
     sessionState.data = {};
     requestHeaders.clear();
     vi.stubGlobal('fetch', fetchMock);
+    delete process.env.ADMIN_PANEL_PUBLIC_URL;
+  });
+
+  afterEach(() => {
+    if (originalPublicUrl === undefined) delete process.env.ADMIN_PANEL_PUBLIC_URL;
+    else process.env.ADMIN_PANEL_PUBLIC_URL = originalPublicUrl;
+  });
+
+  it('sends the configured ADMIN_PANEL_PUBLIC_URL origin ahead of any header derivation', async () => {
+    process.env.ADMIN_PANEL_PUBLIC_URL = 'https://public.example.com/admin';
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('origin', 'http://other.test');
+    requestHeaders.set('host', 'admin-panel:3000');
+    requestHeaders.set('x-forwarded-host', 'internal-lb.local');
+    requestHeaders.set('x-forwarded-proto', 'http');
+    requestHeaders.set('referer', 'https://login.microsoftonline.com/');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '3'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://public.example.com',
+      },
+      body: JSON.stringify({ code: '3'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
+  it('falls back to header derivation when ADMIN_PANEL_PUBLIC_URL is malformed', async () => {
+    process.env.ADMIN_PANEL_PUBLIC_URL = 'not a url';
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('origin', 'https://example.com');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '4'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: '4'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[getRequestOrigin] Ignoring malformed ADMIN_PANEL_PUBLIC_URL:',
+      'not a url',
+    );
   });
 
   it('exchanges the callback code with the PKCE verifier stored in the admin session', async () => {
