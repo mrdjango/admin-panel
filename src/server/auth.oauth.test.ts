@@ -241,6 +241,33 @@ describe('oauthExchangeFn', () => {
     });
   });
 
+  it('rejects a non-web ADMIN_PANEL_PUBLIC_URL scheme instead of sending a null origin', async () => {
+    process.env.ADMIN_PANEL_PUBLIC_URL = 'file:///etc/passwd';
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('origin', 'https://example.com');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '8'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: '8'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[getRequestOrigin] Ignoring malformed ADMIN_PANEL_PUBLIC_URL:',
+      'file:///etc/passwd',
+    );
+  });
+
   it('falls back to header derivation when ADMIN_PANEL_PUBLIC_URL is malformed', async () => {
     process.env.ADMIN_PANEL_PUBLIC_URL = 'not a url';
     sessionState.data = { codeVerifier: 'verifier-123' };
@@ -424,6 +451,29 @@ describe('oauthExchangeFn', () => {
         Origin: 'https://example.com',
       },
       body: JSON.stringify({ code: '1'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
+  it('matches a same-host referer when the serving authority carries an explicit default port', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'example.com:443');
+    requestHeaders.set('referer', 'https://example.com/admin/auth/openid/callback?code=abc');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: '7'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: '7'.repeat(64), code_verifier: 'verifier-123' }),
     });
   });
 

@@ -26,20 +26,32 @@ function getConfiguredPublicOrigin(): string | undefined {
   const publicUrl = process.env.ADMIN_PANEL_PUBLIC_URL;
   if (!publicUrl) return undefined;
   try {
-    return new URL(publicUrl).origin;
+    const url = new URL(publicUrl);
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin !== 'null') {
+      return url.origin;
+    }
   } catch {
-    console.warn('[getRequestOrigin] Ignoring malformed ADMIN_PANEL_PUBLIC_URL:', publicUrl);
-    return undefined;
+    /* fall through to the warning */
   }
+  console.warn('[getRequestOrigin] Ignoring malformed ADMIN_PANEL_PUBLIC_URL:', publicUrl);
+  return undefined;
 }
 
-/** Returns the referer's origin only when its host matches the serving host, so a foreign referer (e.g. an IdP such as Azure EntraID's login.microsoftonline.com) can never be forwarded as the panel's own origin. */
+const DEFAULT_SCHEME_PORTS: Record<string, string> = { 'https:': ':443', 'http:': ':80' };
+
+/** Returns the referer's origin only when its host matches the serving host, so a foreign referer (e.g. an IdP such as Azure EntraID's login.microsoftonline.com) can never be forwarded as the panel's own origin. `URL` strips the scheme's default port from the referer host, so an explicit default port on the serving authority (`example.com:443`) is stripped before comparing. */
 function getSameHostRefererOrigin(host: string): string | undefined {
   const referer = getRequestHeader('referer');
   if (!referer) return undefined;
   try {
     const url = new URL(referer);
-    return url.host.toLowerCase() === host.toLowerCase() ? url.origin : undefined;
+    const defaultPort = DEFAULT_SCHEME_PORTS[url.protocol] ?? '';
+    const servingHost = host.toLowerCase();
+    const normalizedHost =
+      defaultPort && servingHost.endsWith(defaultPort)
+        ? servingHost.slice(0, -defaultPort.length)
+        : servingHost;
+    return url.host.toLowerCase() === normalizedHost ? url.origin : undefined;
   } catch {
     return undefined;
   }
@@ -232,7 +244,8 @@ export const verifyAdminTokenFn = createServerFn({ method: 'GET' }).handler(asyn
       return { valid: false, error: 'Session expired due to inactivity' };
     }
 
-    const needsRevalidation = !lastVerified || now - lastVerified > sessionConfig.revalidationInterval;
+    const needsRevalidation =
+      !lastVerified || now - lastVerified > sessionConfig.revalidationInterval;
 
     if (needsRevalidation) {
       try {
