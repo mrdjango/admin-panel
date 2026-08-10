@@ -650,6 +650,9 @@ export function CustomEndpointsRenderer(props: t.FieldRendererProps) {
   const localize = useLocalize();
   const [createOpen, setCreateOpen] = useState(false);
 
+  /** `yamlBaseKeys` is undefined only when the YAML provenance (baseOnly) fetch failed. Fail closed: with unknown provenance any entry could be YAML-defined, and a staged delete or rename would both fail (the name-based merge restores the YAML entry) and freeze the whole array into the override document. */
+  const provenanceUnknown = !isEditingScope && yamlBaseKeys === undefined;
+
   /** YAML identity locks apply in base mode only; scope overrides layer on top of the resolved base and keep their own affordances. */
   const yamlNames = useMemo(
     () => (isEditingScope ? new Set<string>() : (yamlBaseKeys ?? new Set<string>())),
@@ -658,11 +661,12 @@ export function CustomEndpointsRenderer(props: t.FieldRendererProps) {
 
   const isEntryNameLocked = useCallback(
     (entry: t.ConfigValue) => {
+      if (provenanceUnknown) return true;
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
       const name = (entry as Record<string, t.ConfigValue>).name;
       return typeof name === 'string' && yamlNames.has(name);
     },
-    [yamlNames],
+    [provenanceUnknown, yamlNames],
   );
 
   const renderGroupedEndpointFields = useMemo(
@@ -676,6 +680,7 @@ export function CustomEndpointsRenderer(props: t.FieldRendererProps) {
 
   const entryControls = useCallback(
     (_index: number, item: t.ConfigValue): t.EntryCardControls => {
+      if (provenanceUnknown) return { canRemove: false };
       const obj =
         item && typeof item === 'object' && !Array.isArray(item)
           ? (item as Record<string, t.ConfigValue>)
@@ -699,7 +704,15 @@ export function CustomEndpointsRenderer(props: t.FieldRendererProps) {
           : undefined;
       return { canRemove: false, resetOverrides };
     },
-    [yamlNames, dbOverrideKeys, onResetEntryOverrides, parentPath, hasPendingEdits, localize],
+    [
+      provenanceUnknown,
+      yamlNames,
+      dbOverrideKeys,
+      onResetEntryOverrides,
+      parentPath,
+      hasPendingEdits,
+      localize,
+    ],
   );
 
   const customField = fields.find((f) => f.key === 'custom');

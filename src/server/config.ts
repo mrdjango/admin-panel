@@ -928,11 +928,19 @@ export const getBaseConfigFn = createServerFn({ method: 'GET' }).handler(async (
   };
 });
 
-/** LibreChat merges `endpoints.custom` override arrays into the YAML array by item `name`, so names are the stable entry identity across layers. */
-export function extractCustomEndpointNames(endpoints: t.ConfigValue): string[] | undefined {
-  if (!endpoints || typeof endpoints !== 'object' || Array.isArray(endpoints)) return undefined;
+/**
+ * LibreChat merges `endpoints.custom` override arrays into the YAML array by
+ * item `name`, so names are the stable entry identity across layers. Always
+ * returns an array: a missing or malformed `endpoints.custom` in a
+ * successfully fetched baseOnly config means "no YAML-defined endpoints"
+ * (known-empty provenance). `yamlCustomEndpointKeys` is only ever `undefined`
+ * when the baseOnly fetch itself failed, which the client treats as
+ * provenance-unavailable and fails closed on identity actions.
+ */
+export function extractCustomEndpointNames(endpoints: t.ConfigValue): string[] {
+  if (!endpoints || typeof endpoints !== 'object' || Array.isArray(endpoints)) return [];
   const custom = (endpoints as Record<string, t.ConfigValue>).custom;
-  if (!Array.isArray(custom)) return undefined;
+  if (!Array.isArray(custom)) return [];
   const names: string[] = [];
   for (const item of custom) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;

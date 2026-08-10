@@ -180,6 +180,34 @@ describe('CustomEndpointsRenderer — YAML-defined endpoints (issue #108)', () =
     expect(adminName!.hasAttribute('disabled')).toBe(false);
   });
 
+  it('fails closed when YAML provenance is unavailable: trash hidden, name locked, reset hidden', () => {
+    /** yamlBaseKeys is undefined only when the baseOnly provenance fetch failed; any entry could be YAML-defined, so identity actions lock for all of them. */
+    const { container } = renderCustomEndpoints({
+      items: [yamlEp, adminEp],
+      yamlBaseKeys: undefined,
+      dbOverrideKeys: new Set(['yamlEp', 'adminEp']),
+      onResetEntryOverrides: vi.fn(),
+    });
+    expect(container.querySelector('button[aria-label^="com_ui_delete"]')).toBeNull();
+    expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
+    fireEvent.click(screen.getByText('adminEp'));
+    const adminName = container.querySelector('input#adminEp-name') as HTMLInputElement | null;
+    expect(adminName).not.toBeNull();
+    expect(adminName!.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('keeps entries fully editable when provenance is known and empty (no YAML endpoints)', () => {
+    const { container } = renderCustomEndpoints({
+      items: [adminEp],
+      yamlBaseKeys: new Set<string>(),
+    });
+    expect(container.querySelector('button[aria-label="com_ui_delete adminEp"]')).not.toBeNull();
+    fireEvent.click(screen.getByText('adminEp'));
+    const adminName = container.querySelector('input#adminEp-name') as HTMLInputElement | null;
+    expect(adminName).not.toBeNull();
+    expect(adminName!.hasAttribute('disabled')).toBe(false);
+  });
+
   it('keeps scope mode unaffected: trash stays and name stays editable for YAML endpoints', () => {
     const { container } = renderCustomEndpoints({
       items: [yamlEp],
