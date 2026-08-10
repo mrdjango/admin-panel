@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type * as t from '@/types';
 import { groupsQueryOptions, GROUPS_PAGE_SIZE, MAX_SEARCH_LENGTH } from '@/server';
@@ -22,24 +22,34 @@ export function useGroupSearch(enabled = true): t.GroupSearch {
     setPage(1);
   }, [resetFilter]);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     ...groupsQueryOptions(page, debouncedValue),
     placeholderData: keepPreviousData,
     enabled,
   });
 
   const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / GROUPS_PAGE_SIZE);
+
+  useEffect(() => {
+    if (!data) return;
+    const lastPage = Math.max(1, totalPages);
+    if (page > lastPage) setPage(lastPage);
+  }, [data, page, totalPages]);
+
   return {
     search: value,
     onSearchChange,
     reset,
     groups: data?.groups ?? [],
     total,
-    totalPages: Math.ceil(total / GROUPS_PAGE_SIZE),
+    totalPages,
     page,
     setPage,
     isLoading,
     isFetching,
+    isError,
+    refetch,
     isSearchPending: value !== debouncedValue,
   };
 }

@@ -10,6 +10,9 @@ const TOTAL_GROUPS = 60;
 /** When set, group list requests block until the promise resolves. */
 const mockListGate: { promise: Promise<void> | null } = { promise: null };
 
+/** When set, group list requests fail with a 500. */
+const mockListFail = { fail: false };
+
 const allGroups = Array.from({ length: TOTAL_GROUPS }, (_, i) => ({
   _id: `grp-${i + 1}`,
   name: `Group ${String(i + 1).padStart(2, '0')}`,
@@ -46,6 +49,9 @@ vi.mock('@/server/utils/api', () => ({
     if (url.startsWith('/api/admin/roles')) return json({ roles: [], total: 0 });
     if (url.startsWith('/api/admin/groups?')) {
       if (mockListGate.promise) await mockListGate.promise;
+      if (mockListFail.fail) {
+        return { ok: false, status: 500, json: async () => ({ error: 'boom' }) };
+      }
       const params = new URLSearchParams(url.split('?')[1]);
       const search = params.get('search')?.toLowerCase() ?? '';
       const limit = Number(params.get('limit') ?? 200);
@@ -151,7 +157,7 @@ import { apiFetch } from '@/server/utils/api';
 
 const mockedApiFetch = vi.mocked(apiFetch);
 
-async function renderCreateView() {
+async function openCreateView() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -167,11 +173,17 @@ async function renderCreateView() {
     </QueryClientProvider>,
   );
   fireEvent.click(await screen.findByText('com_scope_create'));
+}
+
+async function renderCreateView() {
+  await openCreateView();
   await screen.findByText('Group 01');
 }
 
 beforeEach(() => {
   mockListGate.promise = null;
+  mockListFail.fail = false;
+  mockedApiFetch.mockClear();
 });
 
 describe('ScopeSelector create view group pagination', () => {
@@ -236,6 +248,52 @@ describe('ScopeSelector create view group pagination', () => {
     });
 
     expect(screen.getByText('Group 51').closest('button')).toBeDisabled();
+  });
+
+  it('ignores pagination clicks while a search request is in flight', async () => {
+    await renderCreateView();
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+
+    let release = () => {};
+    mockListGate.promise = new Promise((resolve) => {
+      release = resolve;
+    });
+    fireEvent.change(screen.getByLabelText('com_access_search_groups'), {
+      target: { value: 'Group 01' },
+    });
+    await waitFor(() =>
+      expect(mockedApiFetch.mock.calls.some(([url]) => url.includes('search='))).toBe(true),
+    );
+
+    fireEvent.click(screen.getByText('next-page'));
+
+    release();
+    mockListGate.promise = null;
+    await screen.findByText('com_scope_already_configured');
+    expect(screen.getByText('Group 01').closest('button')).toBeInTheDocument();
+    expect(screen.queryByText('com_scope_no_matching_groups')).toBeNull();
+    expect(screen.queryByTestId('pagination')).toBeNull();
+
+    const strandedUrls = mockedApiFetch.mock.calls
+      .map(([url]) => url)
+      .filter((url) => url.includes('search=') && url.includes('offset=50'));
+    expect(strandedUrls).toEqual([]);
+  });
+
+  it('renders a retryable error state instead of an empty list when the fetch fails', async () => {
+    mockListFail.fail = true;
+    await openCreateView();
+
+    await screen.findByText('com_error_load_groups');
+    expect(screen.queryByText('com_access_groups_empty')).toBeNull();
+    expect(screen.queryByText('com_scope_no_matching_groups')).toBeNull();
+    expect(screen.queryByTestId('pagination')).toBeNull();
+
+    mockListFail.fail = false;
+    fireEvent.click(screen.getByText('com_ui_retry'));
+
+    await screen.findByText('Group 01');
+    expect(screen.queryByText('com_error_load_groups')).toBeNull();
   });
 
   it('reopening the create view after a search starts from page 1 unfiltered', async () => {

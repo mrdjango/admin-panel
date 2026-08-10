@@ -263,9 +263,14 @@ export function ScopeSelector({
   if (showCreate) {
     const noRoles = availableRoles.length === 0;
     const noGroups = groupSearch.groups.length === 0;
+    const groupsBusy = groupSearch.isFetching || groupSearch.isSearchPending;
     const groupsEmptyKey = groupSearch.search
       ? 'com_scope_no_matching_groups'
       : 'com_access_groups_empty';
+
+    const handleGroupPageChange = (page: number) => {
+      if (!groupsBusy) groupSearch.setPage(page);
+    };
 
     const renderGroupsContent = () => {
       if (groupSearch.isLoading) {
@@ -277,6 +282,20 @@ export function ScopeSelector({
           </div>
         );
       }
+      if (groupSearch.isError) {
+        return (
+          <div className="flex flex-col items-center gap-2 px-4 py-4">
+            <p className="text-center text-xs text-(--cui-color-foreground-danger)">
+              {localize('com_error_load_groups')}
+            </p>
+            <Button
+              type="secondary"
+              label={localize('com_ui_retry')}
+              onClick={groupSearch.refetch}
+            />
+          </div>
+        );
+      }
       if (noGroups) {
         return (
           <p className="px-4 py-4 text-center text-xs text-(--cui-color-text-muted)">
@@ -285,12 +304,7 @@ export function ScopeSelector({
         );
       }
       return (
-        <div
-          className={cn(
-            (groupSearch.isFetching || groupSearch.isSearchPending) &&
-              'pointer-events-none opacity-60 transition-opacity',
-          )}
-        >
+        <div className={cn(groupsBusy && 'pointer-events-none opacity-60 transition-opacity')}>
           {groupSearch.groups.map((group) => {
             const configured = isGroupConfigured(group);
             return (
@@ -298,9 +312,7 @@ export function ScopeSelector({
                 key={group.id}
                 type="button"
                 onClick={() => handleCreateForGroup(group)}
-                disabled={
-                  creating || configured || groupSearch.isFetching || groupSearch.isSearchPending
-                }
+                disabled={creating || configured || groupsBusy}
                 className={cn(
                   'scope-item w-full text-left',
                   creating && 'pointer-events-none opacity-50',
@@ -422,12 +434,17 @@ export function ScopeSelector({
               />
             </div>
             {renderGroupsContent()}
-            {groupSearch.totalPages > 1 && (
-              <div className="flex justify-center py-2">
+            {!groupSearch.isError && groupSearch.totalPages > 1 && (
+              <div
+                className={cn(
+                  'flex justify-center py-2',
+                  groupsBusy && 'pointer-events-none opacity-60',
+                )}
+              >
                 <Pagination
                   currentPage={groupSearch.page}
                   totalPages={groupSearch.totalPages}
-                  onPageChange={groupSearch.setPage}
+                  onPageChange={handleGroupPageChange}
                 />
               </div>
             )}

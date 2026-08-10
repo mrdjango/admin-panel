@@ -171,6 +171,16 @@ describe('useGroupSearch', () => {
     expect(result.current.total).toBe(1);
   });
 
+  it('clamps the page back to the last valid page when the total shrinks below it', async () => {
+    const { result } = renderHook(() => useGroupSearch(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.setPage(10));
+
+    await waitFor(() => expect(result.current.page).toBe(3));
+    await waitFor(() => expect(result.current.groups[0]?.name).toBe('Group 101'));
+  });
+
   it('does not fetch until enabled', async () => {
     const { result, rerender } = renderHook(({ enabled }) => useGroupSearch(enabled), {
       wrapper: createWrapper(),

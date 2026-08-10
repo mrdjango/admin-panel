@@ -45,6 +45,8 @@ export interface GroupSearch {
   readonly setPage: (page: number) => void;
   readonly isLoading: boolean;
   readonly isFetching: boolean;
+  readonly isError: boolean;
+  readonly refetch: () => void;
   /** True while the typed search has not yet been committed by the debounce. */
   readonly isSearchPending: boolean;
 }
