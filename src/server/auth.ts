@@ -21,23 +21,25 @@ function extractCookieValue(response: Response, name: string): string | undefine
   return undefined;
 }
 
+/**
+ * Resolves the admin panel's own origin for LibreChat's exchange-code origin binding.
+ *
+ * Never derived from the `referer` header: when a proxy or client drops the `Origin`
+ * header, the referer identifies whatever page or IdP initiated the request (e.g.
+ * Azure EntraID's login.microsoftonline.com on an IdP-initiated callback), not the
+ * panel itself. Forwarding a foreign origin makes LibreChat reject the exchange code
+ * as expired even though authentication succeeded. The panel's own serving origin is
+ * always derivable from `host` plus the first `x-forwarded-proto` value.
+ */
 function getRequestOrigin(): string | undefined {
   const origin = getRequestHeader('origin');
   if (origin) return origin;
 
-  const referer = getRequestHeader('referer');
-  if (referer) {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      return undefined;
-    }
-  }
-
   const host = getRequestHeader('host');
   if (!host) return undefined;
 
-  const proto = getRequestHeader('x-forwarded-proto') ?? 'http';
+  const forwardedProto = getRequestHeader('x-forwarded-proto');
+  const proto = forwardedProto?.split(',')[0]?.trim() || 'http';
   return `${proto}://${host}`;
 }
 

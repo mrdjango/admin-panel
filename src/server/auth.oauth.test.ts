@@ -243,6 +243,57 @@ describe('oauthExchangeFn', () => {
     );
   });
 
+  it('derives the exchange Origin from the serving host when the callback carries the IdP referer', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('referer', 'https://login.microsoftonline.com/');
+    requestHeaders.set('host', 'example.com');
+    requestHeaders.set('x-forwarded-proto', 'https');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    const result = await oauthExchangeFn({ data: { code: 'c'.repeat(64) } });
+
+    expect(result).toEqual({
+      error: false,
+      user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+    });
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: 'c'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
+  it('uses the first x-forwarded-proto value when the proxy chain appends multiple', async () => {
+    sessionState.data = { codeVerifier: 'verifier-123' };
+    requestHeaders.set('host', 'example.com');
+    requestHeaders.set('x-forwarded-proto', 'https, http');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        token: 'jwt-token',
+        user: { id: 'user-1', role: 'ADMIN', email: 'admin@example.com' },
+      }),
+    );
+
+    await oauthExchangeFn({ data: { code: 'd'.repeat(64) } });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://librechat.test/api/admin/oauth/exchange', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://example.com',
+      },
+      body: JSON.stringify({ code: 'd'.repeat(64), code_verifier: 'verifier-123' }),
+    });
+  });
+
   it('does not consume the one-time LibreChat exchange code when the PKCE verifier was lost', async () => {
     sessionState.data = {};
 
