@@ -102,10 +102,9 @@ export function ScopeSelector({
     [allRoles, existingScopeKeys],
   );
 
-  const availableGroups = useMemo(
-    () =>
-      groupSearch.groups.filter((g) => !existingScopeKeys.has(`${PrincipalType.GROUP}:${g.id}`)),
-    [groupSearch.groups, existingScopeKeys],
+  const isGroupConfigured = useCallback(
+    (group: AdminGroup) => existingScopeKeys.has(`${PrincipalType.GROUP}:${group.id}`),
+    [existingScopeKeys],
   );
 
   const handleCreateForRole = useCallback(
@@ -259,10 +258,10 @@ export function ScopeSelector({
 
   if (showCreate) {
     const noRoles = availableRoles.length === 0;
-    const noGroups = availableGroups.length === 0;
+    const noGroups = groupSearch.groups.length === 0;
     const groupsEmptyKey = groupSearch.search
       ? 'com_scope_no_matching_groups'
-      : 'com_scope_no_available_groups';
+      : 'com_access_groups_empty';
 
     const renderGroupsContent = () => {
       if (groupSearch.isLoading) {
@@ -283,30 +282,47 @@ export function ScopeSelector({
       }
       return (
         <div className={cn(groupSearch.isFetching && 'opacity-60 transition-opacity')}>
-          {availableGroups.map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              onClick={() => handleCreateForGroup(group)}
-              disabled={creating}
-              className={cn(
-                'scope-item w-full text-left',
-                creating && 'pointer-events-none opacity-50',
-              )}
-            >
-              <span aria-hidden="true" className="scope-icon" style={{ color: groupConfig.color }}>
-                <Icon name={groupConfig.icon} size="sm" />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium text-(--cui-color-text-default)">
-                  {group.name}
-                </span>
-                {group.description && (
-                  <span className="text-xs text-(--cui-color-text-muted)">{group.description}</span>
+          {groupSearch.groups.map((group) => {
+            const configured = isGroupConfigured(group);
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => handleCreateForGroup(group)}
+                disabled={creating || configured}
+                className={cn(
+                  'scope-item w-full text-left',
+                  creating && 'pointer-events-none opacity-50',
+                  configured && 'pointer-events-none opacity-60',
                 )}
-              </span>
-            </button>
-          ))}
+              >
+                <span
+                  aria-hidden="true"
+                  className="scope-icon"
+                  style={{ color: groupConfig.color }}
+                >
+                  <Icon name={groupConfig.icon} size="sm" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-(--cui-color-text-default)">
+                      {group.name}
+                    </span>
+                    {configured && (
+                      <span className="rounded-sm bg-(--cui-color-background-secondary) px-1.5 py-0.5 text-[10px] font-medium text-(--cui-color-text-muted)">
+                        {localize('com_scope_already_configured')}
+                      </span>
+                    )}
+                  </span>
+                  {group.description && (
+                    <span className="text-xs text-(--cui-color-text-muted)">
+                      {group.description}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       );
     };

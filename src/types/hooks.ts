@@ -1,3 +1,4 @@
+import type { AdminGroup } from '@librechat/data-schemas';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { PrincipalType } from 'librechat-data-provider';
 
@@ -30,6 +31,18 @@ export interface UseProfileMutationsReturn {
     { principalType: PrincipalType; principalId: string }
   >;
   saving: boolean;
+}
+
+export interface GroupSearch {
+  readonly search: string;
+  readonly onSearchChange: (next: string) => void;
+  readonly groups: AdminGroup[];
+  readonly total: number;
+  readonly totalPages: number;
+  readonly page: number;
+  readonly setPage: (page: number) => void;
+  readonly isLoading: boolean;
+  readonly isFetching: boolean;
 }
 
 export interface ReorderVoiceover {

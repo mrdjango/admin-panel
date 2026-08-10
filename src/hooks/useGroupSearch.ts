@@ -1,25 +1,13 @@
 import { useCallback, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { AdminGroup } from '@librechat/data-schemas';
+import type * as t from '@/types';
 import { groupsQueryOptions, GROUPS_PAGE_SIZE } from '@/server';
 import { useDebouncedFilter } from './useDebouncedFilter';
-
-interface GroupSearch {
-  readonly search: string;
-  readonly onSearchChange: (next: string) => void;
-  readonly groups: AdminGroup[];
-  readonly total: number;
-  readonly totalPages: number;
-  readonly page: number;
-  readonly setPage: (page: number) => void;
-  readonly isLoading: boolean;
-  readonly isFetching: boolean;
-}
 
 /** Debounced server-side group search with offset pagination, so consumers
  * can browse every group instead of a single capped page. Searching resets
  * to the first page; previous results are kept while a new page loads. */
-export function useGroupSearch(enabled = true): GroupSearch {
+export function useGroupSearch(enabled = true): t.GroupSearch {
   const [page, setPage] = useState(1);
   const resetPage = useCallback(() => setPage(1), []);
   const { value, debouncedValue, onChange } = useDebouncedFilter('', resetPage);
