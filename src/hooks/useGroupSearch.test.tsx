@@ -132,6 +132,31 @@ describe('useGroupSearch', () => {
     expect(sent).toHaveLength(200);
   });
 
+  it('reset synchronously clears search and page without issuing stale requests', async () => {
+    const { result } = renderHook(() => useGroupSearch(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => result.current.setPage(3));
+    await waitFor(() => expect(result.current.groups[0]?.name).toBe('Group 101'));
+    act(() => result.current.onSearchChange('Needle'));
+    await waitFor(() => expect(result.current.total).toBe(1));
+
+    act(() => result.current.onSearchChange('Nee'));
+    const callsBefore = mockedApiFetch.mock.calls.length;
+    act(() => result.current.reset());
+
+    expect(result.current.search).toBe('');
+    expect(result.current.page).toBe(1);
+    await waitFor(() => expect(result.current.groups[0]?.name).toBe('Group 1'));
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const staleUrls = mockedApiFetch.mock.calls
+      .slice(callsBefore)
+      .map(([url]) => url)
+      .filter((url) => url.includes('search='));
+    expect(staleUrls).toEqual([]);
+  });
+
   it('does not fetch until enabled', async () => {
     const { result, rerender } = renderHook(({ enabled }) => useGroupSearch(enabled), {
       wrapper: createWrapper(),

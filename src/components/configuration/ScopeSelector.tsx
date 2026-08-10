@@ -48,20 +48,24 @@ export function ScopeSelector({
   });
 
   const groupSearch = useGroupSearch(open && showCreate);
-  const { onSearchChange: onGroupSearchChange } = groupSearch;
+  const { reset: resetGroupSearch } = groupSearch;
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
     if (listRef.current) listRef.current.scrollTop = 0;
   }, []);
 
-  const resetState = useCallback(() => {
+  const closeCreate = useCallback(() => {
     setShowCreate(false);
+    resetGroupSearch();
+  }, [resetGroupSearch]);
+
+  const resetState = useCallback(() => {
     setCreating(false);
     setDeleteTarget(null);
     setDeleting(false);
-    onGroupSearchChange('');
-  }, [onGroupSearchChange]);
+    closeCreate();
+  }, [closeCreate]);
 
   const close = useCallback(() => {
     onOpenChange(false);
@@ -342,7 +346,8 @@ export function ScopeSelector({
         <div className="flex items-center gap-2 border-b border-(--cui-color-stroke-default) px-4 py-3">
           <button
             type="button"
-            onClick={() => setShowCreate(false)}
+            onClick={closeCreate}
+            aria-label={localize('com_scope_create_back')}
             className="flex cursor-pointer items-center text-(--cui-color-text-muted) hover:text-(--cui-color-text-default)"
           >
             <Icon name="chevron-left" size="sm" />

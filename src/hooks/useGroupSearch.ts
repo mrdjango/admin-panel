@@ -10,7 +10,12 @@ import { useDebouncedFilter } from './useDebouncedFilter';
 export function useGroupSearch(enabled = true): t.GroupSearch {
   const [page, setPage] = useState(1);
   const resetPage = useCallback(() => setPage(1), []);
-  const { value, debouncedValue, onChange } = useDebouncedFilter('', resetPage);
+  const { value, debouncedValue, onChange, reset: resetFilter } = useDebouncedFilter('', resetPage);
+
+  const reset = useCallback(() => {
+    resetFilter();
+    setPage(1);
+  }, [resetFilter]);
 
   const { data, isLoading, isFetching } = useQuery({
     ...groupsQueryOptions(page, debouncedValue),
@@ -22,6 +27,7 @@ export function useGroupSearch(enabled = true): t.GroupSearch {
   return {
     search: value,
     onSearchChange: onChange,
+    reset,
     groups: data?.groups ?? [],
     total,
     totalPages: Math.ceil(total / GROUPS_PAGE_SIZE),

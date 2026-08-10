@@ -36,6 +36,8 @@ export interface UseProfileMutationsReturn {
 export interface GroupSearch {
   readonly search: string;
   readonly onSearchChange: (next: string) => void;
+  /** Synchronously clear the search input, debounced value, and page. */
+  readonly reset: () => void;
   readonly groups: AdminGroup[];
   readonly total: number;
   readonly totalPages: number;

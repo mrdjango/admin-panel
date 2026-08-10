@@ -43,9 +43,13 @@ vi.mock('@/server/utils/api', () => ({
     if (url.startsWith('/api/admin/roles')) return json({ roles: [], total: 0 });
     if (url.startsWith('/api/admin/groups?')) {
       const params = new URLSearchParams(url.split('?')[1]);
+      const search = params.get('search')?.toLowerCase() ?? '';
       const limit = Number(params.get('limit') ?? 200);
       const offset = Number(params.get('offset') ?? 0);
-      return json({ groups: allGroups.slice(offset, offset + limit), total: allGroups.length });
+      const matches = search
+        ? allGroups.filter((group) => group.name.toLowerCase().includes(search))
+        : allGroups;
+      return json({ groups: matches.slice(offset, offset + limit), total: matches.length });
     }
     const byId = allGroups.find((group) => url === `/api/admin/groups/${group._id}`);
     if (byId) return json({ group: byId });
@@ -139,6 +143,9 @@ vi.mock('@radix-ui/react-dialog', () => ({
 }));
 
 import { ScopeSelector } from './ScopeSelector';
+import { apiFetch } from '@/server/utils/api';
+
+const mockedApiFetch = vi.mocked(apiFetch);
 
 async function renderCreateView() {
   const queryClient = new QueryClient({
@@ -182,5 +189,29 @@ describe('ScopeSelector create view group pagination', () => {
     const eligibleButton = (await screen.findByText('Group 51')).closest('button');
     expect(eligibleButton).toBeEnabled();
     expect(screen.queryByText('com_scope_already_configured')).toBeNull();
+  });
+
+  it('reopening the create view after a search starts from page 1 unfiltered', async () => {
+    await renderCreateView();
+
+    fireEvent.change(screen.getByLabelText('com_access_search_groups'), {
+      target: { value: 'Group 51' },
+    });
+    await screen.findByText('Group 51');
+    expect(screen.queryByText('Group 01')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('com_scope_create_back'));
+    const callsAfterBack = mockedApiFetch.mock.calls.length;
+    fireEvent.click(screen.getByText('com_scope_create'));
+
+    await screen.findByText('Group 01');
+    expect(screen.getByLabelText('com_access_search_groups')).toHaveValue('');
+    expect(screen.queryByText('Group 51')).toBeNull();
+
+    const staleUrls = mockedApiFetch.mock.calls
+      .slice(callsAfterBack)
+      .map(([url]) => url)
+      .filter((url) => url.includes('search='));
+    expect(staleUrls).toEqual([]);
   });
 });
