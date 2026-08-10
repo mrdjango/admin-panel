@@ -394,6 +394,20 @@ describe('McpServersRenderer — per-entry clear overrides (issue #73)', () => {
     expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
   });
 
+  it('hides the reset action for keys the field-path validator rejects', () => {
+    const baseRecord = {
+      constructor: { type: 'sse', url: 'https://example.com', title: 'Overridden' },
+    };
+    renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set(['constructor']),
+      dbOverrideKeys: new Set(['constructor']),
+      onResetEntryOverrides: vi.fn(),
+    });
+    expect(screen.queryByTestId('icon-button-refresh')).toBeNull();
+    expect(screen.queryByRole('button', { name: /com_ui_delete/ })).toBeNull();
+  });
+
   it('hides the reset action for admin-only servers (they have delete instead)', () => {
     const baseRecord = {
       adminOnly: { type: 'sse', url: 'https://admin.example.com' },

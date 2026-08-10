@@ -43,6 +43,9 @@ const TRANSPORT_TYPE_OPTIONS: { label: string; value: string }[] = [
 
 const ALWAYS_REQUIRED = new Set(['type']);
 
+/** Segments `safeFieldPath` rejects server-side; a server key matching one can never round-trip through the field-path API. */
+const UNADDRESSABLE_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Stable empty record used as the fallback for `baseRecord`/`parentValue` when no data is available, so the downstream `useMemo` chain on `editsByEntry`/`record` does not re-fire on every render with a fresh `{}` literal. */
 const EMPTY_RECORD: Record<string, t.ConfigValue> = Object.freeze({}) as Record<
   string,
@@ -1051,18 +1054,18 @@ const McpEntryRow = memo(function McpEntryRowImpl({
     effectiveType !== rawType ? { ...entryObj, type: effectiveType } : entryValue;
 
   const entryPathBase = `${path}.${entryKey}`;
-  /** Dotted entry names predate the dot-rejecting create/rename validators; the save endpoint parses fieldPath as dot-delimited so any per-leaf write under such a key collides with a parallel "legacy" → "dotted" nested-object interpretation. Render them read-only so they stay visible in the list but never round-trip through the per-field save API. */
-  const isDottedLegacy = entryKey.includes('.');
-  const isReadOnly = !!disabled || isDottedLegacy;
-  const isLockedIdentity = (!isEditingScope && isYamlSource) || isDottedLegacy;
-  const lockedKeys = isYamlSource && !isDottedLegacy ? YAML_LOCKED_FIELDS : undefined;
+  /** Dotted entry names predate the dot-rejecting create/rename validators; the save endpoint parses fieldPath as dot-delimited so any per-leaf write under such a key collides with a parallel "legacy" → "dotted" nested-object interpretation. Keys matching `safeFieldPath`'s rejected segments are equally unaddressable: every field-path write or unset for them fails server-side validation. Render both read-only so they stay visible in the list but never round-trip through the per-field save API. */
+  const isUnaddressableKey = entryKey.includes('.') || UNADDRESSABLE_SEGMENTS.has(entryKey);
+  const isReadOnly = !!disabled || isUnaddressableKey;
+  const isLockedIdentity = (!isEditingScope && isYamlSource) || isUnaddressableKey;
+  const lockedKeys = isYamlSource && !isUnaddressableKey ? YAML_LOCKED_FIELDS : undefined;
 
   const entryOnChange = useCallback(
     (leafKey: string, leafValue: t.ConfigValue) => {
-      if (isDottedLegacy) return;
+      if (isUnaddressableKey) return;
       onChange(`${entryPathBase}.${leafKey}`, leafValue);
     },
-    [onChange, entryPathBase, isDottedLegacy],
+    [onChange, entryPathBase, isUnaddressableKey],
   );
 
   const renderEntryFields: t.CollectionRenderFields = useCallback(
@@ -1083,10 +1086,10 @@ const McpEntryRow = memo(function McpEntryRowImpl({
   /** Required by ObjectEntryCard's onValueChange contract; unused on leaf edits. */
   const handleWholeEntryChange = useCallback(
     (v: t.ConfigValue) => {
-      if (isDottedLegacy) return;
+      if (isUnaddressableKey) return;
       onChange(entryPathBase, v);
     },
-    [onChange, entryPathBase, isDottedLegacy],
+    [onChange, entryPathBase, isUnaddressableKey],
   );
 
   const resetOverrides: t.EntryResetAction | undefined =
