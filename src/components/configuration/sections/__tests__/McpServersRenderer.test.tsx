@@ -165,6 +165,7 @@ function fieldsForMcp(): t.SchemaField[] {
     createField({ key: 'command', type: 'string', isOptional: true }),
     createField({ key: 'title', type: 'string', isOptional: true }),
     createField({ key: 'description', type: 'string', isOptional: true }),
+    createField({ key: 'apiKey', type: 'string', isOptional: true }),
     createField({ key: 'tools', type: 'array<string>', isOptional: true, isArray: true }),
     createField({ key: 'source', type: 'string', isOptional: true }),
   ];
@@ -177,6 +178,7 @@ function renderRenderer({
   yamlBaseKeys,
   dbOverrideKeys,
   isEditingScope,
+  editSessionId,
   onChange = vi.fn(),
   onResetEntryOverrides,
   onValidationError = vi.fn(),
@@ -187,6 +189,7 @@ function renderRenderer({
   yamlBaseKeys?: Set<string>;
   dbOverrideKeys?: Set<string>;
   isEditingScope?: boolean;
+  editSessionId?: number;
   onChange?: (path: string, value: t.ConfigValue) => void;
   onResetEntryOverrides?: (target: t.EntryResetTarget) => void;
   onValidationError?: (message: string) => void;
@@ -207,11 +210,15 @@ function renderRenderer({
     yamlBaseKeys,
     dbOverrideKeys,
     isEditingScope,
+    editSessionId,
     onResetEntryOverrides,
     onValidationError,
   };
+  const result = render(<McpServersRenderer {...props} />);
   return {
-    ...render(<McpServersRenderer {...props} />),
+    ...result,
+    rerenderWithSession: (sessionId: number) =>
+      result.rerender(<McpServersRenderer {...props} editSessionId={sessionId} />),
     onChange,
     onValidationError,
     fields,
@@ -428,6 +435,36 @@ describe('McpServersRenderer — per-entry clear overrides (issue #73)', () => {
     });
     const resetBtn = screen.getByTestId('icon-button-refresh');
     expect(resetBtn.hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('McpServersRenderer — editSessionId remounts secret replacement state', () => {
+  it('abandons an open untouched Replace input when the edit session changes (e.g. after an entry reset)', () => {
+    const baseRecord = {
+      kapa: { type: 'sse', url: 'https://x.com', apiKeyPreview: 'sk-test...1234' },
+    };
+    const { container, rerenderWithSession } = renderRenderer({
+      baseRecord,
+      yamlBaseKeys: new Set<string>(),
+      editSessionId: 0,
+    });
+
+    fireEvent.click(screen.getByText('kapa'));
+    fireEvent.click(screen.getByText('com_config_group_authentication'));
+    const replaceBtn = container.querySelector(
+      'button[aria-label^="com_a11y_secret_replace"]',
+    ) as HTMLButtonElement | null;
+    expect(replaceBtn).not.toBeNull();
+    fireEvent.click(replaceBtn!);
+    expect(
+      container.querySelector('button[aria-label^="com_a11y_secret_cancel_replace"]'),
+    ).not.toBeNull();
+
+    rerenderWithSession(1);
+    expect(
+      container.querySelector('button[aria-label^="com_a11y_secret_cancel_replace"]'),
+    ).toBeNull();
+    expect(container.querySelector('button[aria-label^="com_a11y_secret_replace"]')).not.toBeNull();
   });
 });
 

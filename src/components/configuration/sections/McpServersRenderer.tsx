@@ -212,6 +212,7 @@ function flattenGroupFields(
   disabled?: boolean,
   collectionRenderOverrides?: Record<string, t.CollectionRenderFields>,
   lockedKeys?: Set<string>,
+  editSessionId?: number,
 ): ReactNode[] {
   const values = isPlainObject(parentValue) ? parentValue : {};
 
@@ -264,6 +265,7 @@ function flattenGroupFields(
             fieldDisabled,
             collectionRenderOverrides,
             true,
+            editSessionId,
           ),
         );
       }
@@ -278,6 +280,7 @@ function flattenGroupFields(
           fieldDisabled,
           collectionRenderOverrides,
           true,
+          editSessionId,
         ),
       );
     }
@@ -340,6 +343,7 @@ function FieldGroup({
   defaultExpanded,
   transportType,
   lockedKeys,
+  editSessionId,
 }: {
   labelKey: string;
   fields: t.SchemaField[];
@@ -350,6 +354,7 @@ function FieldGroup({
   defaultExpanded: boolean;
   transportType: string;
   lockedKeys?: Set<string>;
+  editSessionId?: number;
 }) {
   const localize = useLocalize();
   const { isExpanded, hasEverExpanded, sectionRef, toggle } = useCollapsibleSection({
@@ -394,6 +399,7 @@ function FieldGroup({
             disabled,
             undefined,
             lockedKeys,
+            editSessionId,
           )}
         </div>,
       )}
@@ -408,6 +414,7 @@ function McpEntryFields({
   onChange,
   disabled,
   lockedKeys,
+  editSessionId,
 }: {
   fields: t.SchemaField[];
   parentValue: t.ConfigValue;
@@ -415,6 +422,7 @@ function McpEntryFields({
   onChange: (path: string, value: t.ConfigValue) => void;
   disabled?: boolean;
   lockedKeys?: Set<string>;
+  editSessionId?: number;
 }) {
   const localize = useLocalize();
   const values = isPlainObject(parentValue) ? parentValue : {};
@@ -479,6 +487,7 @@ function McpEntryFields({
                 disabled,
                 undefined,
                 lockedKeys,
+                editSessionId,
               )}
             </div>
           )}
@@ -494,6 +503,7 @@ function McpEntryFields({
               defaultExpanded={child.defaultExpanded}
               transportType={currentType}
               lockedKeys={lockedKeys}
+              editSessionId={editSessionId}
             />
           ))}
         </FieldGroupSection>
@@ -512,6 +522,7 @@ function McpEntryFields({
         defaultExpanded={group.defaultExpanded}
         transportType={currentType}
         lockedKeys={lockedKeys}
+        editSessionId={editSessionId}
       />
     );
   };
@@ -530,6 +541,7 @@ function McpEntryFields({
           defaultExpanded={false}
           transportType={currentType}
           lockedKeys={lockedKeys}
+          editSessionId={editSessionId}
         />
       )}
     </div>
@@ -666,6 +678,7 @@ export function McpServersRenderer(props: t.FieldRendererProps) {
     isEditingScope,
     onResetEntryOverrides,
     onValidationError,
+    editSessionId,
   } = props;
   const localize = useLocalize();
   const [createOpen, setCreateOpen] = useState(false);
@@ -968,6 +981,7 @@ export function McpServersRenderer(props: t.FieldRendererProps) {
           onRename={handleRename}
           onResetOverrides={onResetEntryOverrides ? handleResetOverrides : undefined}
           justAdded={key === justAddedKey}
+          editSessionId={editSessionId}
         />
       ))}
       {!disabled && entries.length === 0 && (
@@ -1010,6 +1024,7 @@ const McpEntryRow = memo(function McpEntryRowImpl({
   onRename,
   onResetOverrides,
   justAdded,
+  editSessionId,
 }: {
   entryKey: string;
   entryValue: t.ConfigValue;
@@ -1025,6 +1040,7 @@ const McpEntryRow = memo(function McpEntryRowImpl({
   onRename: (oldKey: string, newKey: string) => void;
   onResetOverrides?: (key: string) => void;
   justAdded: boolean;
+  editSessionId?: number;
 }) {
   const localize = useLocalize();
   const entryObj = isPlainObject(entryValue) ? entryValue : {};
@@ -1058,9 +1074,10 @@ const McpEntryRow = memo(function McpEntryRowImpl({
         onChange={entryOnChange}
         disabled={isReadOnly}
         lockedKeys={lockedKeys}
+        editSessionId={editSessionId}
       />
     ),
-    [entryOnChange, isReadOnly, lockedKeys],
+    [entryOnChange, isReadOnly, lockedKeys, editSessionId],
   );
 
   /** Required by ObjectEntryCard's onValueChange contract; unused on leaf edits. */

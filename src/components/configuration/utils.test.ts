@@ -621,6 +621,33 @@ describe('buildEntryOverridesResetPlan', () => {
     ).toEqual({ resetPaths: [], saves: [] });
   });
 
+  it('emits sibling items in the omit shape the backend secret preservation expects', () => {
+    /** LibreChat's PATCH handler restores secrets omitted from same-name items (preserveArraySecrets omit-to-keep), so the rewritten array must carry NO apiKey or apiKeyPreview key on redacted siblings. Passthrough references like env placeholders come back readable from the redacted GET and round-trip verbatim. */
+    const dbOverrides = {
+      endpoints: {
+        custom: [
+          { name: 'yamlEp', apiKeyPreview: 'sk-yaml...1111' },
+          { name: 'adminEp', apiKeyPreview: 'sk-admi...2222', baseURL: 'https://a.example' },
+          { name: 'envEp', apiKey: '${MY_KEY}' },
+        ],
+      },
+    };
+    const plan = buildEntryOverridesResetPlan(
+      { fieldPath: 'endpoints.custom', itemName: 'yamlEp' },
+      dbOverrides,
+      schemaPaths,
+    );
+    expect(plan.saves).toEqual([
+      {
+        fieldPath: 'endpoints.custom',
+        value: [
+          { name: 'adminEp', baseURL: 'https://a.example' },
+          { name: 'envEp', apiKey: '${MY_KEY}' },
+        ],
+      },
+    ]);
+  });
+
   it('strips masked secret previews from the rewritten override array', () => {
     const dbOverrides = {
       endpoints: {
