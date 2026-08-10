@@ -9,6 +9,7 @@ import {
   mergeIndexedArrayEdits,
   buildSavePayload,
   applyConfigEdit,
+  kvPairsEditValue,
 } from './utils';
 import { createField } from '@/test/fixtures';
 import { flattenObject } from '@/utils';
@@ -541,5 +542,52 @@ describe('buildSavePayload — masked secrets never reach the backend', () => {
     const { saves, resets } = buildSavePayload(new Set(['ocr.apiKey']), edited, schemaPaths);
     expect(saves).toEqual([]);
     expect(resets).toEqual(['ocr.apiKey']);
+  });
+});
+
+describe('kvPairsEditValue', () => {
+  it('passes non-empty pairs through unchanged for save-time serialization', () => {
+    const pairs: t.KeyValuePair[] = [
+      { key: 'Authorization', value: 'Bearer {{API_KEY}}', valueType: 'string' },
+    ];
+    expect(kvPairsEditValue(pairs)).toBe(pairs);
+  });
+
+  it('converts an emptied pair list to an empty record', () => {
+    expect(kvPairsEditValue([])).toEqual({});
+  });
+});
+
+describe('buildSavePayload — KV pairs serialize to records', () => {
+  it('converts header pairs edits to a plain record in the save payload', () => {
+    const edited: t.FlatConfigMap = {
+      'mcpServers.srv.headers': [
+        { key: 'Authorization', value: 'Bearer {{API_KEY}}', valueType: 'string' },
+      ],
+    };
+    const { saves } = buildSavePayload(new Set(['mcpServers.srv.headers']), edited, new Set());
+    expect(saves).toEqual([
+      { fieldPath: 'mcpServers.srv.headers', value: { Authorization: 'Bearer {{API_KEY}}' } },
+    ]);
+  });
+
+  it('converts pairs nested inside indexed array entries (azure additional params)', () => {
+    const edited: t.FlatConfigMap = {
+      'endpoints.azureOpenAI.groups.0': {
+        group: 'my-group',
+        addParams: [{ key: 'reasoning_effort', value: 'high', valueType: 'string' }],
+      },
+    };
+    const { saves } = buildSavePayload(
+      new Set(['endpoints.azureOpenAI.groups.0']),
+      edited,
+      new Set(),
+    );
+    expect(saves).toEqual([
+      {
+        fieldPath: 'endpoints.azureOpenAI.groups.0',
+        value: { group: 'my-group', addParams: { reasoning_effort: 'high' } },
+      },
+    ]);
   });
 });

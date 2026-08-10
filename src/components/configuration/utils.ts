@@ -34,6 +34,17 @@ export function inferKVType(v: t.ConfigValue): t.KVValueType {
   return 'string';
 }
 
+/**
+ * Wraps a KeyValueField edit for storage in edit state. In-progress rows stay
+ * as raw pairs so blank keys survive re-renders until save-time serialization,
+ * but an emptied list must become an empty record immediately: a bare `[]`
+ * cannot be recognized as KV pairs by `serializeKVPairs` and would reach the
+ * backend as an array where the schema expects an object.
+ */
+export function kvPairsEditValue(pairs: t.KeyValuePair[]): t.ConfigValue {
+  return pairs.length === 0 ? {} : pairs;
+}
+
 export function toKVPair(k: string, v: t.ConfigValue): t.KeyValuePair {
   const valueType = inferKVType(v);
   if (valueType === 'json') return { key: k, value: JSON.stringify(v, null, 2), valueType };

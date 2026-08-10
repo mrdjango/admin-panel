@@ -6,9 +6,9 @@ import { ProfileValueModal, getDefaultValue } from './ProfileValueModal';
 import { DeleteProfileValueModal } from './DeleteProfileValueModal';
 import { EditButton, TrashButton } from '@/components/shared';
 import { useProfileMutations, useLocalize } from '@/hooks';
+import { deepSerializeKVPairs, cn } from '@/utils';
 import { availableScopesOptions } from '@/server';
 import { getScopeTypeConfig } from '@/constants';
-import { serializeKVPairs, cn } from '@/utils';
 import { getControlType } from './utils';
 
 export function FieldProfilePopover({
@@ -71,7 +71,7 @@ export function FieldProfilePopover({
 
   const handleModalSave = useCallback(() => {
     if (modalIsBase && onBaseValueChange) {
-      onBaseValueChange(serializeKVPairs(modalValue));
+      onBaseValueChange(deepSerializeKVPairs(modalValue));
       setModalOpen(false);
       setModalIsBase(false);
       return;
@@ -81,7 +81,7 @@ export function FieldProfilePopover({
       {
         principalType: modalScope.principalType,
         principalId: modalScope.principalId,
-        value: serializeKVPairs(modalValue),
+        value: deepSerializeKVPairs(modalValue),
       },
       {
         onSuccess: () => {
