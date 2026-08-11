@@ -419,6 +419,13 @@ textarea:focus-visible {
   border-radius: var(--cui-radii-sm) !important;
 }
 
+/* click-ui Select popover: the option list matches the trigger width while the
+   popover border-box loses 2px to its 1px borders, so overflow:hidden clips the
+   keyboard-highlight ring's right edge; inset the ring past the overhang. */
+[data-input-modality='keyboard'] [data-highlighted] {
+  outline-offset: -4px !important;
+}
+
 .scope-selector-dialog {
   width: min(640px, calc(100vw - 2rem));
 }
