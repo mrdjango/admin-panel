@@ -23,6 +23,7 @@ export function GrantManagementTab() {
   const [editTarget, setEditTarget] = useState<t.PrincipalRow | null>(null);
   const { message: announcement, announce } = useAnnouncement();
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  const activeRowRef = useRef<HTMLElement | null>(null);
 
   const { data: grants = [], isLoading: grantsLoading } = useQuery(allGrantsQueryOptions);
   const { data: roles = [] } = useQuery(allRolesQueryOptions);
@@ -46,12 +47,9 @@ export function GrantManagementTab() {
     announce(localize('com_a11y_cap_filter_changed', { count }));
   };
 
-  const handleDialogClose = () => {
-    const key = editTarget ? `${editTarget.principalType}:${editTarget.principalId}` : null;
-    setEditTarget(null);
-    if (key) {
-      requestAnimationFrame(() => rowRefs.current.get(key)?.focus());
-    }
+  const openEditor = (row: t.PrincipalRow, key: string) => {
+    activeRowRef.current = rowRefs.current.get(key) ?? null;
+    setEditTarget(row);
   };
 
   if (grantsLoading) {
@@ -96,11 +94,11 @@ export function GrantManagementTab() {
                   key={key}
                   row={row}
                   isLast={i === paged.length - 1}
-                  onClick={() => setEditTarget(row)}
+                  onClick={() => openEditor(row, key)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setEditTarget(row);
+                      openEditor(row, key);
                     }
                   }}
                   rowRef={(el) => {
@@ -126,7 +124,8 @@ export function GrantManagementTab() {
         principalType={editTarget?.principalType ?? null}
         principalId={editTarget?.principalId ?? null}
         principalName={editTarget?.name ?? ''}
-        onClose={handleDialogClose}
+        fallbackRef={activeRowRef}
+        onClose={() => setEditTarget(null)}
       />
 
       <ScreenReaderAnnouncer message={announcement} />

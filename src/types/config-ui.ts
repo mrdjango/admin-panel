@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type {
   ConfigScope,
   IconName,
@@ -141,6 +141,7 @@ export interface ConfirmSaveDialogProps {
   originalValues: FlatConfigMap;
   saving: boolean;
   error?: string | null;
+  fallbackRef?: RefObject<HTMLElement | null>;
   onConfirm: () => void;
   onCancel: () => void;
 }
