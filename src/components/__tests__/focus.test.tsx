@@ -5,21 +5,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type * as t from '@/types';
-import { DeleteProfileValueModal } from './configuration/DeleteProfileValueModal';
-import { ResetBaseConfigDialog } from './configuration/ResetBaseConfigDialog';
-import { EditCapabilitiesDialog } from './grants/EditCapabilitiesDialog';
-import { ProfileValueModal } from './configuration/ProfileValueModal';
-import { GrantManagementTab } from './grants/GrantManagementTab';
-import { ConfirmSaveDialog } from './configuration/ConfirmSaveDialog';
-import { ImportYamlDialog } from './configuration/ImportYamlDialog';
-import { CreateGroupDialog } from './access/CreateGroupDialog';
-import { CreateRoleDialog } from './access/CreateRoleDialog';
+import { DeleteProfileValueModal } from '../configuration/DeleteProfileValueModal';
+import { ResetBaseConfigDialog } from '../configuration/ResetBaseConfigDialog';
+import { EditCapabilitiesDialog } from '../grants/EditCapabilitiesDialog';
+import { ProfileValueModal } from '../configuration/ProfileValueModal';
+import { GrantManagementTab } from '../grants/GrantManagementTab';
+import { ConfirmSaveDialog } from '../configuration/ConfirmSaveDialog';
+import { ImportYamlDialog } from '../configuration/ImportYamlDialog';
+import { CreateGroupDialog } from '../access/CreateGroupDialog';
+import { CreateRoleDialog } from '../access/CreateRoleDialog';
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { EditGroupDialog } from './access/EditGroupDialog';
-import { EditRoleDialog } from './access/EditRoleDialog';
+import { EditGroupDialog } from '../access/EditGroupDialog';
+import { EditRoleDialog } from '../access/EditRoleDialog';
 import { defaultPermissions } from '@/constants';
-import { SettingsDialog } from './SettingsDialog';
-import { FormDialog } from './shared/FormDialog';
+import { SettingsDialog } from '../SettingsDialog';
+import { FormDialog } from '../shared/FormDialog';
 
 vi.mock('@/hooks/useLocalize', () => ({
   default: () => (key: string) => key,
