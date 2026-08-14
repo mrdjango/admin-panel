@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as t from '@/types';
 import { openidLoginFn } from '@/server';
-import { AuthCard } from './AuthCard';
+import { AuthCard } from '../AuthCard';
 
 vi.mock('@/server', () => ({
   adminLoginFn: vi.fn(),
