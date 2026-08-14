@@ -5,14 +5,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type * as t from '@/types';
+import { DeleteProfileValueModal } from './configuration/DeleteProfileValueModal';
+import { ResetBaseConfigDialog } from './configuration/ResetBaseConfigDialog';
 import { EditCapabilitiesDialog } from './grants/EditCapabilitiesDialog';
+import { ProfileValueModal } from './configuration/ProfileValueModal';
+import { GrantManagementTab } from './grants/GrantManagementTab';
 import { ConfirmSaveDialog } from './configuration/ConfirmSaveDialog';
 import { ImportYamlDialog } from './configuration/ImportYamlDialog';
 import { CreateGroupDialog } from './access/CreateGroupDialog';
 import { CreateRoleDialog } from './access/CreateRoleDialog';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { EditGroupDialog } from './access/EditGroupDialog';
 import { EditRoleDialog } from './access/EditRoleDialog';
 import { defaultPermissions } from '@/constants';
+import { SettingsDialog } from './SettingsDialog';
 import { FormDialog } from './shared/FormDialog';
 
 vi.mock('@/hooks/useLocalize', () => ({
@@ -25,6 +31,21 @@ vi.mock('@/server', async () => {
   return {
     MEMBERS_PAGE_SIZE: 25,
     availableScopesOptions: { queryKey: ['availableScopes'], queryFn: async () => [] },
+    allGrantsQueryOptions: { queryKey: ['allGrants'], queryFn: async () => [] },
+    allRolesQueryOptions: {
+      queryKey: ['allRoles'],
+      queryFn: async () => [
+        {
+          id: 'role-1',
+          name: 'Admins',
+          description: '',
+          isSystemRole: false,
+          isActive: true,
+          userCount: 0,
+          permissions: permissions(),
+        },
+      ],
+    },
     roleQueryOptions: (id: string) => ({
       queryKey: ['role', id],
       queryFn: async () => ({
@@ -69,6 +90,19 @@ class ResizeObserverStub implements ResizeObserver {
 }
 vi.stubGlobal('ResizeObserver', ResizeObserverStub);
 
+vi.stubGlobal('matchMedia', (query: string): MediaQueryList => {
+  return {
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  } as MediaQueryList;
+});
+
 const noop = () => {};
 
 const testRole: t.Role = {
@@ -87,6 +121,14 @@ const testGroup = {
   description: '',
   memberCount: 0,
   topMembers: [],
+  isActive: true,
+};
+
+const testScope: t.ConfigScope = {
+  principalType: PrincipalType.ROLE,
+  principalId: 'role-1',
+  name: 'Admins',
+  priority: 100,
   isActive: true,
 };
 
@@ -159,6 +201,45 @@ const cases: FocusCase[] = [
       />
     ),
   },
+  {
+    name: 'SettingsDialog',
+    renderDialog: (open, close) => <SettingsDialog open={open} onClose={close} />,
+  },
+  {
+    name: 'ResetBaseConfigDialog',
+    renderDialog: (open, close) => (
+      <ResetBaseConfigDialog open={open} resetting={false} onConfirm={noop} onCancel={close} />
+    ),
+  },
+  {
+    name: 'ProfileValueModal',
+    renderDialog: (open, close) => (
+      <ProfileValueModal
+        open={open}
+        controlType="text"
+        value="hello"
+        onChange={noop}
+        onSave={noop}
+        onCancel={close}
+        saving={false}
+        scopeName="Base"
+        scopeType="BASE"
+        mode="edit"
+      />
+    ),
+  },
+  {
+    name: 'DeleteProfileValueModal',
+    renderDialog: (open, close) => (
+      <DeleteProfileValueModal
+        scope={open ? testScope : null}
+        fieldLabel="Field"
+        saving={false}
+        onConfirm={noop}
+        onCancel={close}
+      />
+    ),
+  },
 ];
 
 function CaseHarness({ renderDialog }: { renderDialog: FocusCase['renderDialog'] }) {
@@ -168,10 +249,12 @@ function CaseHarness({ renderDialog }: { renderDialog: FocusCase['renderDialog']
   );
   return (
     <QueryClientProvider client={client}>
-      <button type="button" onClick={() => setOpen(true)}>
-        case trigger
-      </button>
-      {renderDialog(open, () => setOpen(false))}
+      <ThemeProvider>
+        <button type="button" onClick={() => setOpen(true)}>
+          case trigger
+        </button>
+        {renderDialog(open, () => setOpen(false))}
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
@@ -186,5 +269,25 @@ describe('dialog focus return', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+});
+
+describe('grant table focus return', () => {
+  it('restores focus to the edited row even when activation did not focus it', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <GrantManagementTab />
+      </QueryClientProvider>,
+    );
+    const row = await screen.findByRole('button', { name: 'com_cap_edit_title' });
+    const search = screen.getByPlaceholderText('com_ui_search');
+    search.focus();
+    fireEvent.click(row);
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(search).not.toHaveFocus();
   });
 });

@@ -47,8 +47,11 @@ export function GrantManagementTab() {
     announce(localize('com_a11y_cap_filter_changed', { count }));
   };
 
+  /** Focus the row before opening so useReturnFocus captures it even when pointer activation left focus elsewhere (e.g. the search box). */
   const openEditor = (row: t.PrincipalRow, key: string) => {
-    activeRowRef.current = rowRefs.current.get(key) ?? null;
+    const rowEl = rowRefs.current.get(key) ?? null;
+    rowEl?.focus();
+    activeRowRef.current = rowEl;
     setEditTarget(row);
   };
 
