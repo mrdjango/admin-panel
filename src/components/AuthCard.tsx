@@ -76,6 +76,16 @@ export function AuthCard({
       });
   }, [autoRedirectSso, localize, redirectTo]);
 
+  useEffect(() => {
+    // A bfcache restore (browser Back from the IdP) revives the pre-navigation
+    // React state, so reset the loading flag left true by the outbound redirect.
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setSsoLoading(false);
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
   const emailSchema = useMemo(
     () => z.string().email(localize('com_auth_email_invalid')),
     [localize],

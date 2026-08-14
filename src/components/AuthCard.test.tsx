@@ -80,6 +80,23 @@ describe('AuthCard SSO login', () => {
     expect(button).toBeDisabled();
   });
 
+  it('resets the loading state when the page is restored from the back-forward cache', async () => {
+    const authUrl = 'https://idp.example.com/authorize';
+    openidLoginFnMock.mockResolvedValue({ error: false, authUrl });
+    renderAuthCard();
+
+    fireEvent.click(getSsoButton());
+    await waitFor(() => expect(locationStub.href).toBe(authUrl));
+
+    fireEvent(window, Object.assign(new Event('pageshow'), { persisted: false }));
+    expect(getSsoRedirectingButton()).toBeDisabled();
+
+    fireEvent(window, Object.assign(new Event('pageshow'), { persisted: true }));
+    const button = getSsoButton();
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(button).toBeEnabled();
+  });
+
   it('returns the button to non-loading when the request resolves with an error', async () => {
     openidLoginFnMock.mockResolvedValue({ error: true, message: 'Failed to initiate SSO login' });
     renderAuthCard();
