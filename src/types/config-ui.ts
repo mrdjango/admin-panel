@@ -165,6 +165,7 @@ export interface ResetBaseConfigDialogProps {
   open: boolean;
   resetting: boolean;
   error?: string | null;
+  fallbackRef?: RefObject<HTMLElement | null>;
   onConfirm: () => void;
   onCancel: () => void;
 }

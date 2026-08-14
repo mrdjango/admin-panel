@@ -13,7 +13,7 @@ import {
 } from './auditLogUtils';
 import { LoadingState } from '@/components/shared';
 import { getScopeTypeConfig } from '@/constants';
-import { useLocalize } from '@/hooks';
+import { useLocalize, useReturnFocus } from '@/hooks';
 import { cn } from '@/utils';
 
 interface AuditLogDetailDrawerProps {
@@ -135,6 +135,7 @@ export function AuditLogDetailDrawer({
   loadError = false,
 }: AuditLogDetailDrawerProps): ReactElement | null {
   const localize = useLocalize();
+  const returnFocus = useReturnFocus(open);
 
   // Keep the last non-null entry so the close animation has content to render
   // while Radix Dialog slides the panel out. Without this, unmounting on
@@ -225,6 +226,7 @@ export function AuditLogDetailDrawer({
           <Dialog.Content
             aria-label={localize('com_audit_detail_title')}
             onEscapeKeyDown={() => onClose()}
+            onCloseAutoFocus={returnFocus}
             className={cn(
               'fixed top-0 right-0 z-(--z-overlay) flex h-full w-full flex-col bg-(--cui-color-background-panel) shadow-xl sm:w-120',
               'border-l border-(--cui-color-stroke-default)',
@@ -272,6 +274,7 @@ export function AuditLogDetailDrawer({
           <Dialog.Content
             aria-label={localize('com_audit_detail_title')}
             onEscapeKeyDown={() => onClose()}
+            onCloseAutoFocus={returnFocus}
             className={cn(
               'fixed top-0 right-0 z-(--z-overlay) flex h-full w-full flex-col bg-(--cui-color-background-panel) shadow-xl sm:w-120',
               'border-l border-(--cui-color-stroke-default)',
@@ -324,6 +327,7 @@ export function AuditLogDetailDrawer({
           <Dialog.Content
             aria-label={localize('com_audit_detail_title')}
             onEscapeKeyDown={() => onClose()}
+            onCloseAutoFocus={returnFocus}
             className={cn(
               'fixed top-0 right-0 z-(--z-overlay) flex h-full w-full flex-col bg-(--cui-color-background-panel) shadow-xl sm:w-120',
               'border-l border-(--cui-color-stroke-default)',
@@ -389,6 +393,7 @@ export function AuditLogDetailDrawer({
         <Dialog.Content
           aria-label={localize('com_audit_detail_title')}
           onEscapeKeyDown={() => onClose()}
+          onCloseAutoFocus={returnFocus}
           className={cn(
             'fixed top-0 right-0 z-(--z-overlay) flex h-full w-full flex-col bg-(--cui-color-background-panel) shadow-xl sm:w-120',
             'border-l border-(--cui-color-stroke-default)',

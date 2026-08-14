@@ -6,11 +6,12 @@ export function ResetBaseConfigDialog({
   open,
   resetting,
   error,
+  fallbackRef,
   onConfirm,
   onCancel,
 }: t.ResetBaseConfigDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(open);
+  const returnFocus = useReturnFocus(open, fallbackRef);
 
   return (
     <Dialog

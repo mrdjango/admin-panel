@@ -1068,6 +1068,7 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
         open={resetBaseOpen}
         resetting={resettingBase}
         error={resetBaseError}
+        fallbackRef={saveFallbackRef}
         onConfirm={handleResetBaseConfig}
         onCancel={() => {
           if (resettingBase) return;

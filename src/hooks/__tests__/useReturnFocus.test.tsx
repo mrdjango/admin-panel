@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { useRef, useState } from 'react';
 import { Dialog } from '@clickhouse/click-ui';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useReturnFocus } from './useReturnFocus';
+import { useReturnFocus } from '../useReturnFocus';
 
 function Harness({ showTrigger }: { showTrigger: boolean }) {
   const [open, setOpen] = useState(false);
