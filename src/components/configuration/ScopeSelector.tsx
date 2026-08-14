@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Title as DialogTitle, Description as DialogDescription } from '@radix-ui/react-dialog';
 import type { AdminGroup } from '@librechat/data-schemas';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, PointerEvent } from 'react';
 import type * as t from '@/types';
 import {
   availableScopesOptions,
@@ -45,7 +45,7 @@ export function ScopeSelector({
   const [deleteTarget, setDeleteTarget] = useState<t.ConfigScope | null>(null);
   const [deleting, setDeleting] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const navigatedRef = useRef(false);
+  const highlightedRef = useRef(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
 
   const { data: scopes = [], isLoading: loading } = useQuery({
@@ -72,13 +72,20 @@ export function ScopeSelector({
   const handleSearchKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (NAVIGATION_KEYS.has(e.key) || (e.ctrlKey && VIM_NAVIGATION_KEYS.has(e.key))) {
-        navigatedRef.current = true;
+        highlightedRef.current = true;
         return;
       }
-      if (e.key === 'Enter' && search === '' && !navigatedRef.current) e.stopPropagation();
+      if (e.key === 'Enter' && search === '' && !highlightedRef.current) e.stopPropagation();
     },
     [search],
   );
+
+  /** cmdk also moves the highlight when the pointer travels over an item, so hover counts as an explicit highlight too. */
+  const handleListPointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    if (e.target instanceof Element && e.target.closest('[cmdk-item]')) {
+      highlightedRef.current = true;
+    }
+  }, []);
 
   const handleDeleteAutoFocus = useCallback((e: Event) => {
     e.preventDefault();
@@ -90,7 +97,7 @@ export function ScopeSelector({
     setCreating(false);
     setDeleteTarget(null);
     setDeleting(false);
-    navigatedRef.current = false;
+    highlightedRef.current = false;
   }, []);
 
   const close = useCallback(() => {
@@ -414,7 +421,11 @@ export function ScopeSelector({
         )}
       </div>
 
-      <Command.List ref={listRef} className="max-h-95 overflow-y-auto p-2 pb-3">
+      <Command.List
+        ref={listRef}
+        onPointerMove={handleListPointerMove}
+        className="max-h-95 overflow-y-auto p-2 pb-3"
+      >
         {loading ? (
           <div className="flex items-center justify-center gap-2 px-4 py-8">
             <span aria-hidden="true">

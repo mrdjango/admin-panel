@@ -186,6 +186,16 @@ describe('ScopeSelector Enter key handling', () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  it('selects a scope with Enter after hovering it with the mouse', async () => {
+    const user = userEvent.setup();
+    const { onSelect, onOpenChange } = await renderListView();
+    await user.hover(screen.getByText('Engineering'));
+    screen.getByRole('combobox').focus();
+    await user.keyboard('{Enter}');
+    expect(onSelect).toHaveBeenCalledWith({ type: 'SCOPE', scope: engineeringScope });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('still selects a scope with arrow navigation followed by Enter', async () => {
     const user = userEvent.setup();
     const { onSelect, onOpenChange } = await renderListView();
