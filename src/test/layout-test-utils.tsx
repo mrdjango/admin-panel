@@ -16,14 +16,9 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 
 const APP_PATHS = ['/', '/configuration', '/access', '/grants', '/help'];
 
-interface LayoutRenderOptions {
-  user?: t.SidebarProps['user'];
-  path?: string;
-}
-
 export function renderWithLayoutProviders(
   ui: ReactNode,
-  { user = null, path = '/' }: LayoutRenderOptions = {},
+  { user = null, path = '/' }: t.LayoutRenderOptions = {},
 ): RenderResult {
   const rootRoute = createRootRoute();
   const appRoute = createRoute({
