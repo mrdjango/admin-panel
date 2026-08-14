@@ -275,6 +275,7 @@ export interface FieldRendererProps {
 
 export interface ImportYamlDialogProps {
   open: boolean;
+  fallbackRef?: RefObject<HTMLElement | null>;
   onClose: () => void;
   onImport: (appConfig: Record<string, ConfigValue>) => void;
   onImportAsProfile: (appConfig: Record<string, ConfigValue>, scope: ConfigScope) => Promise<void>;

@@ -10,12 +10,13 @@ import { cn } from '@/utils';
 
 export function ImportYamlDialog({
   open,
+  fallbackRef,
   onClose,
   onImport,
   onImportAsProfile,
 }: t.ImportYamlDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(open);
+  const returnFocus = useReturnFocus(open, fallbackRef);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const targetRef = useRef<HTMLDivElement>(null);
 

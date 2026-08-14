@@ -1059,6 +1059,7 @@ export function ConfigPage({ initialTab, highlightField, initialScope }: t.Confi
 
       <ImportYamlDialog
         open={importOpen}
+        fallbackRef={saveFallbackRef}
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
         onImportAsProfile={handleImportAsProfile}
