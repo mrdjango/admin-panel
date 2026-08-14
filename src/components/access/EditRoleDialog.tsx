@@ -26,9 +26,9 @@ import { useLocalize, useReturnFocus } from '@/hooks';
 
 type EditRoleTab = 'details' | 'permissions' | 'members';
 
-export function EditRoleDialog({ role, canManage, onClose }: t.EditRoleDialogProps) {
+export function EditRoleDialog({ role, canManage, fallbackRef, onClose }: t.EditRoleDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(!!role);
+  const returnFocus = useReturnFocus(!!role, fallbackRef);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<EditRoleTab>('details');
   const [name, setName] = useState(role?.name ?? '');

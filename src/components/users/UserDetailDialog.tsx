@@ -38,13 +38,14 @@ const CONFIRM_TITLE_KEYS: Record<t.RemoveTarget['kind'], string> = {
  */
 export function UserDetailDialog({
   user,
+  fallbackRef,
   onClose,
   canManageRoles = false,
   canManageGroups = false,
   canAssignConfigs = false,
 }: t.UserDetailDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(!!user);
+  const returnFocus = useReturnFocus(!!user, fallbackRef);
   const queryClient = useQueryClient();
 
   const [view, setView] = useState<'main' | 'add'>('main');

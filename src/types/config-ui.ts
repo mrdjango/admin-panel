@@ -157,6 +157,7 @@ export interface DeleteProfileValueModalProps {
   scope: ConfigScope | null;
   fieldLabel: string;
   saving: boolean;
+  fallbackRef?: RefObject<HTMLElement | null>;
   onConfirm: (scope: ConfigScope) => void;
   onCancel: () => void;
 }
@@ -328,6 +329,7 @@ export interface ProfileValueModalProps {
   scopeName: string;
   scopeType: string;
   mode: 'edit' | 'add';
+  fallbackRef?: RefObject<HTMLElement | null>;
 }
 
 export interface ModalValueControlProps {

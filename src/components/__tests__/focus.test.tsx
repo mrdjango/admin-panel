@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { PrincipalType } from 'librechat-data-provider';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type * as t from '@/types';
 import { DeleteProfileValueModal } from '../configuration/DeleteProfileValueModal';
 import { ResetBaseConfigDialog } from '../configuration/ResetBaseConfigDialog';
@@ -270,6 +270,121 @@ describe('dialog focus return', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     await waitFor(() => expect(trigger).toHaveFocus());
   });
+});
+
+interface FallbackCase {
+  name: string;
+  renderDialog: (
+    open: boolean,
+    close: () => void,
+    fallbackRef: RefObject<HTMLElement | null>,
+  ) => ReactNode;
+}
+
+const fallbackCases: FallbackCase[] = [
+  {
+    name: 'SettingsDialog',
+    renderDialog: (open, close, fallbackRef) => (
+      <SettingsDialog open={open} fallbackRef={fallbackRef} onClose={close} />
+    ),
+  },
+  {
+    name: 'EditRoleDialog',
+    renderDialog: (open, close, fallbackRef) => (
+      <EditRoleDialog
+        role={open ? testRole : null}
+        canManage
+        fallbackRef={fallbackRef}
+        onClose={close}
+      />
+    ),
+  },
+  {
+    name: 'EditGroupDialog',
+    renderDialog: (open, close, fallbackRef) => (
+      <EditGroupDialog
+        group={open ? testGroup : null}
+        canManage
+        fallbackRef={fallbackRef}
+        onClose={close}
+      />
+    ),
+  },
+  {
+    name: 'ProfileValueModal',
+    renderDialog: (open, close, fallbackRef) => (
+      <ProfileValueModal
+        open={open}
+        controlType="text"
+        value="hello"
+        onChange={noop}
+        onSave={noop}
+        onCancel={close}
+        saving={false}
+        scopeName="Base"
+        scopeType="BASE"
+        mode="add"
+        fallbackRef={fallbackRef}
+      />
+    ),
+  },
+  {
+    name: 'DeleteProfileValueModal',
+    renderDialog: (open, close, fallbackRef) => (
+      <DeleteProfileValueModal
+        scope={open ? testScope : null}
+        fieldLabel="Field"
+        saving={false}
+        fallbackRef={fallbackRef}
+        onConfirm={noop}
+        onCancel={close}
+      />
+    ),
+  },
+];
+
+function FallbackHarness({
+  renderDialog,
+  showTrigger,
+}: {
+  renderDialog: FallbackCase['renderDialog'];
+  showTrigger: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const fallbackRef = useRef<HTMLDivElement>(null);
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <ThemeProvider>
+        {showTrigger && (
+          <button type="button" onClick={() => setOpen(true)}>
+            case trigger
+          </button>
+        )}
+        <div ref={fallbackRef} tabIndex={-1} data-testid="fallback" />
+        {renderDialog(open, () => setOpen(false), fallbackRef)}
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+describe('dialog focus fallback', () => {
+  it.each(fallbackCases)(
+    '$name focuses the fallback when the trigger unmounts before close',
+    async ({ renderDialog }) => {
+      const { rerender } = render(<FallbackHarness renderDialog={renderDialog} showTrigger />);
+      const trigger = screen.getByRole('button', { name: 'case trigger' });
+      trigger.focus();
+      fireEvent.click(trigger);
+      const dialog = await screen.findByRole('dialog');
+      rerender(<FallbackHarness renderDialog={renderDialog} showTrigger={false} />);
+      fireEvent.keyDown(dialog, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.getByTestId('fallback')).toHaveFocus());
+    },
+  );
 });
 
 describe('grant table focus return', () => {

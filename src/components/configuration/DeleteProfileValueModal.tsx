@@ -5,13 +5,14 @@ import { getScopeTypeConfig } from '@/constants';
 
 export function DeleteProfileValueModal({
   scope,
+  fallbackRef,
   fieldLabel,
   saving,
   onConfirm,
   onCancel,
 }: t.DeleteProfileValueModalProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(!!scope);
+  const returnFocus = useReturnFocus(!!scope, fallbackRef);
   const scopeConfig = scope ? getScopeTypeConfig(scope.principalType) : null;
 
   return (

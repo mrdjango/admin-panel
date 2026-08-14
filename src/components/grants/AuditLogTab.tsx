@@ -113,6 +113,7 @@ export function AuditLogTab() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const { message: announcement, announce } = useAnnouncement();
+  const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
   const resetToFirstPage = useCallback(() => setCurrentPage(1), []);
   const searchFilter = useDebouncedFilter('', resetToFirstPage);
@@ -287,8 +288,10 @@ export function AuditLogTab() {
     !entryOnPage &&
     (!isAuditEntryId(entryId) || (entryFetch.isSuccess && entryFetch.data?.entry === null));
 
+  /** Focus the row before opening so the drawer's useReturnFocus captures it even when pointer activation left focus elsewhere (e.g. a filter input). */
   const openEntry = useCallback(
     (id: string) => {
+      rowRefs.current.get(id)?.focus();
       void navigate({ search: (prev: Record<string, unknown>) => ({ ...prev, entryId: id }) });
     },
     [navigate],
@@ -314,7 +317,11 @@ export function AuditLogTab() {
         announce(localize('com_a11y_copy_failed'));
         return false;
       }
-      const url = buildEntryPermalink(id, window.location.origin, import.meta.env.VITE_BASE_PATH || '');
+      const url = buildEntryPermalink(
+        id,
+        window.location.origin,
+        import.meta.env.VITE_BASE_PATH || '',
+      );
       try {
         await navigator.clipboard.writeText(url);
         return true;
@@ -579,6 +586,9 @@ export function AuditLogTab() {
                   isLast={i === pageEntries.length - 1}
                   onActivate={() => openEntry(entry.id)}
                   onKeyDown={(e) => handleRowKeyDown(e, entry.id)}
+                  rowRef={(el) => {
+                    if (el) rowRefs.current.set(entry.id, el);
+                  }}
                   localize={localize}
                 />
               ))}
@@ -655,18 +665,21 @@ function AuditLogTableRow({
   isLast,
   onActivate,
   onKeyDown,
+  rowRef,
   localize,
 }: {
   entry: t.AuditLogEntryWithDiff;
   isLast: boolean;
   onActivate: () => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTableRowElement>) => void;
+  rowRef: (el: HTMLTableRowElement | null) => void;
   localize: ReturnType<typeof useLocalize>;
 }) {
   const targetConfig = getScopeTypeConfig(entry.target.type as PrincipalType);
   const capability = auditCapability(entry);
   return (
     <tr
+      ref={rowRef}
       role="button"
       tabIndex={0}
       aria-label={localize('com_a11y_audit_row_open')}

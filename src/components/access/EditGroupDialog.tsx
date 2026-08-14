@@ -23,9 +23,14 @@ import { useLocalize, useReturnFocus } from '@/hooks';
 
 type EditGroupTab = 'details' | 'members';
 
-export function EditGroupDialog({ group, canManage, onClose }: t.EditGroupDialogProps) {
+export function EditGroupDialog({
+  group,
+  canManage,
+  fallbackRef,
+  onClose,
+}: t.EditGroupDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(!!group);
+  const returnFocus = useReturnFocus(!!group, fallbackRef);
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<EditGroupTab>('details');
   const [name, setName] = useState(group?.name ?? '');

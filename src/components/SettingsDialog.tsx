@@ -11,9 +11,9 @@ const THEME_LABEL_KEYS: Record<t.ThemeOption, string> = {
   dark: 'com_nav_theme_dark',
 };
 
-export function SettingsDialog({ open, onClose }: t.SettingsDialogProps) {
+export function SettingsDialog({ open, fallbackRef, onClose }: t.SettingsDialogProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(open);
+  const returnFocus = useReturnFocus(open, fallbackRef);
   const { theme, setTheme } = useTheme();
 
   return (

@@ -21,9 +21,10 @@ export function ProfileValueModal({
   scopeName,
   scopeType,
   mode,
+  fallbackRef,
 }: t.ProfileValueModalProps) {
   const localize = useLocalize();
-  const returnFocus = useReturnFocus(open);
+  const returnFocus = useReturnFocus(open, fallbackRef);
   const scopeConfig = getScopeTypeConfig(scopeType as PrincipalType | 'BASE');
 
   const title =
