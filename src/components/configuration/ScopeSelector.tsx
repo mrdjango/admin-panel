@@ -100,6 +100,13 @@ export function ScopeSelector({
     highlightedRef.current = false;
   }, []);
 
+  /** Returning to the list remounts the cmdk view with the first item auto-highlighted, so a highlight carried over from the previous view must not let Enter select it. */
+  const returnToList = useCallback(() => {
+    setShowCreate(false);
+    setDeleteTarget(null);
+    highlightedRef.current = false;
+  }, []);
+
   const close = useCallback(() => {
     onOpenChange(false);
     resetState();
@@ -208,13 +215,22 @@ export function ScopeSelector({
       ) {
         onSelect({ type: 'BASE' });
       }
-      setDeleteTarget(null);
+      returnToList();
       setDeleting(false);
     } catch (err) {
       setDeleting(false);
       onError?.(err instanceof Error ? err.message : localize('com_scope_delete_error'));
     }
-  }, [deleteTarget, deleting, queryClient, currentSelection, onSelect, onError, localize]);
+  }, [
+    deleteTarget,
+    deleting,
+    queryClient,
+    currentSelection,
+    onSelect,
+    onError,
+    localize,
+    returnToList,
+  ]);
 
   const roleScopes = useMemo(
     () => scopes.filter((s) => s.principalType === PrincipalType.ROLE),
@@ -255,7 +271,7 @@ export function ScopeSelector({
               <Button
                 type="secondary"
                 label={localize('com_ui_cancel')}
-                onClick={() => setDeleteTarget(null)}
+                onClick={returnToList}
                 disabled={deleting}
               />
               <Button
@@ -288,7 +304,7 @@ export function ScopeSelector({
           <div className="flex items-center gap-2 border-b border-(--cui-color-stroke-default) pb-2">
             <button
               type="button"
-              onClick={() => setShowCreate(false)}
+              onClick={returnToList}
               aria-label={localize('com_ui_back')}
               className="flex cursor-pointer items-center text-(--cui-color-text-muted) hover:text-(--cui-color-text-default)"
             >

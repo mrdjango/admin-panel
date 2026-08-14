@@ -96,12 +96,16 @@ async function renderListView() {
   return handlers;
 }
 
-async function openDeleteConfirmation(user: ReturnType<typeof userEvent.setup>) {
-  const handlers = await renderListView();
+async function openDeleteConfirmationFromList(user: ReturnType<typeof userEvent.setup>) {
   const deleteButton = screen.getByRole('button', { name: 'com_scope_delete' });
   deleteButton.focus();
   await user.keyboard('{Enter}');
   await screen.findByText('com_scope_delete_confirm');
+}
+
+async function openDeleteConfirmation(user: ReturnType<typeof userEvent.setup>) {
+  const handlers = await renderListView();
+  await openDeleteConfirmationFromList(user);
   return handlers;
 }
 
@@ -183,6 +187,21 @@ describe('ScopeSelector Enter key handling', () => {
     await user.keyboard('{Enter}');
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
     expect(mocks.deleteScopeFn).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('does not select the auto-highlighted Base scope with Enter after cancelling a delete reached by hovering', async () => {
+    const user = userEvent.setup();
+    const { onSelect, onOpenChange } = await renderListView();
+    await user.hover(screen.getByText('Engineering'));
+    await openDeleteConfirmationFromList(user);
+    const cancelButton = screen.getByRole('button', { name: 'com_ui_cancel' });
+    cancelButton.focus();
+    await user.keyboard('{Enter}');
+    const searchInput = await screen.findByRole('combobox');
+    searchInput.focus();
+    await user.keyboard('{Enter}');
+    expect(onSelect).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
