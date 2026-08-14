@@ -90,7 +90,7 @@ export function Sidebar({ user, collapsed, onToggle }: t.SidebarProps) {
           <div
             className={cn(
               'flex items-center overflow-hidden',
-              collapsed ? 'w-full justify-center gap-0 px-0' : 'gap-2.5 px-1.5',
+              collapsed ? 'w-10 justify-center gap-0 px-0' : 'gap-2.5 px-1.5',
             )}
           >
             <img
@@ -120,7 +120,7 @@ export function Sidebar({ user, collapsed, onToggle }: t.SidebarProps) {
                 title={collapsed ? localize(item.labelKey) : undefined}
                 className={cn(
                   'flex h-8 items-center overflow-hidden rounded-md px-2.5 text-sm whitespace-nowrap no-underline transition-colors duration-100',
-                  collapsed ? 'justify-center gap-0' : 'gap-2.5',
+                  collapsed ? 'w-10 justify-center gap-0' : 'gap-2.5',
                   isActive(item.path)
                     ? 'bg-(--cui-color-background-active) font-medium text-(--cui-color-text-default)'
                     : 'font-normal text-(--cui-color-text-muted) hover:bg-(--cui-color-background-hover) hover:text-(--cui-color-text-default)',
@@ -142,7 +142,7 @@ export function Sidebar({ user, collapsed, onToggle }: t.SidebarProps) {
             <div
               className={cn(
                 'flex items-center',
-                collapsed ? 'w-full justify-center gap-0 px-0' : 'gap-2.5 px-0.5',
+                collapsed ? 'w-10 justify-center gap-0 px-0' : 'gap-2.5 px-0.5',
               )}
             >
               <Dropdown>
