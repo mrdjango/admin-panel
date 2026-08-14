@@ -106,6 +106,7 @@ export function GrantManagementTab() {
                   }}
                   rowRef={(el) => {
                     if (el) rowRefs.current.set(key, el);
+                    else rowRefs.current.delete(key);
                   }}
                 />
               );

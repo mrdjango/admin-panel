@@ -114,6 +114,7 @@ export function AuditLogTab() {
   const [currentPage, setCurrentPage] = useState(1);
   const { message: announcement, announce } = useAnnouncement();
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  const tabFallbackRef = useRef<HTMLDivElement>(null);
 
   const resetToFirstPage = useCallback(() => setCurrentPage(1), []);
   const searchFilter = useDebouncedFilter('', resetToFirstPage);
@@ -392,7 +393,11 @@ export function AuditLogTab() {
   const exportLabel = localize('com_audit_export_server');
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pt-4 pr-1 pl-1">
+    <div
+      ref={tabFallbackRef}
+      tabIndex={-1}
+      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pt-4 pr-1 pl-1"
+    >
       <div className="flex items-center justify-between gap-3">
         <div
           className="flex flex-1 flex-wrap items-center gap-3"
@@ -588,6 +593,7 @@ export function AuditLogTab() {
                   onKeyDown={(e) => handleRowKeyDown(e, entry.id)}
                   rowRef={(el) => {
                     if (el) rowRefs.current.set(entry.id, el);
+                    else rowRefs.current.delete(entry.id);
                   }}
                   localize={localize}
                 />
@@ -632,6 +638,7 @@ export function AuditLogTab() {
 
       <AuditLogDetailDrawer
         entry={selectedEntry}
+        fallbackRef={tabFallbackRef}
         /**
          * Drawer is open whenever a deep-link `entryId` is in the URL. This
          * keeps the panel mounted (showing a Loading state inside) while the

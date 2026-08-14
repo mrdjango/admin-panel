@@ -199,6 +199,7 @@ export function UsersPage() {
                   canManage={canManage}
                   rowRef={(el) => {
                     if (el) rowRefs.current.set(user.id, el);
+                    else rowRefs.current.delete(user.id);
                   }}
                 />
               ))}
@@ -279,7 +280,7 @@ function UserRow({
       ref={rowRef}
       tabIndex={-1}
       className={cn(
-        'cursor-pointer bg-(--cui-color-background-panel) transition-colors outline-none hover:bg-(--cui-color-background-hover)',
+        'cursor-pointer bg-(--cui-color-background-panel) transition-colors outline-none hover:bg-(--cui-color-background-hover) focus-visible:bg-(--cui-color-background-hover) focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-(--cui-color-outline)',
         !isLast && 'border-b border-(--cui-color-stroke-default)',
       )}
       onClick={onViewDetails}
