@@ -1330,6 +1330,18 @@ describe('validateFieldValue for endpoints', () => {
     expect(result).toEqual({ success: true });
   });
 
+  it('includes the full path for nested array validation errors', () => {
+    const result = validateFieldValue('endpoints.custom', [
+      validEndpoint,
+      { ...validEndpoint, models: { fetch: true } },
+    ]);
+
+    expect(result).toEqual({
+      success: false,
+      error: 'endpoints.custom[1].models.default: Required',
+    });
+  });
+
   it('gracefully handles unknown deep paths', () => {
     const result = validateFieldValue('endpoints.custom.0.nonexistent.deep', 'value');
     expect(result).toEqual({ success: true });

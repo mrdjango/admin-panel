@@ -625,7 +625,14 @@ export function validateFieldValue(
       }
     ).safeParse(value);
     if (!result.success && result.error) {
-      const messages = result.error.issues.map((i) => i.message);
+      const messages = result.error.issues.map((issue) => {
+        const issuePath = issue.path.reduce(
+          (path, segment) =>
+            typeof segment === 'number' ? `${path}[${segment}]` : `${path}.${segment}`,
+          fieldPath,
+        );
+        return `${issuePath}: ${issue.message}`;
+      });
       return { success: false, error: messages.join('; ') || 'Validation failed' };
     }
   }
@@ -1102,7 +1109,7 @@ export const saveBaseConfigFn = createServerFn({ method: 'POST' })
       }
     }
     if (errors.length > 0) {
-      const details = errors.map((e) => `${e.fieldPath}: ${e.error}`).join('; ');
+      const details = errors.map((e) => e.error).join('; ');
       throw new Error(`Validation failed — ${details}`);
     }
 
