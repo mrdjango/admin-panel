@@ -30,12 +30,6 @@ FROM base AS build
 COPY --from=deps /app/node_modules node_modules
 COPY . .
 COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
-# The lockfile pins an older data-provider, so the fork's build can import a
-# dependency that version never declared (croner, at the time of writing).
-# Nesting the fork's own runtime dependencies inside the package resolves them
-# without touching the lockfile, which bun keeps frozen in CI, and covers any
-# dependency the fork gains later.
-COPY --from=data-provider /src/tchat/packages/data-provider/node_modules node_modules/librechat-data-provider/node_modules
 ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NODE_ENV=production
@@ -49,7 +43,6 @@ COPY tools/ tools/
 RUN bun install --frozen-lockfile \
     && bun install --frozen-lockfile --production
 COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
-COPY --from=data-provider /src/tchat/packages/data-provider/node_modules node_modules/librechat-data-provider/node_modules
 
 # --- Runtime ---
 FROM base AS runtime
