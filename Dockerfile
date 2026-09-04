@@ -26,8 +26,14 @@ RUN bun install --frozen-lockfile
 # --- Build ---
 FROM base AS build
 COPY --from=deps /app/node_modules node_modules
-COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
 COPY . .
+COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
+COPY --from=data-provider /src/tchat/packages/data-provider/package.json /tmp/data-provider.json
+# The lockfile pins an older data-provider, so the fork's build can import a
+# dependency that version never declared (croner, at the time of writing).
+# Installing what the fork's package.json declares keeps that from recurring
+# each time it gains one.
+RUN bun add $(bun -e 'const d=require("/tmp/data-provider.json").dependencies ?? {}; console.log(Object.entries(d).map(([n, v]) => `${n}@${v}`).join(" "))')
 ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV NODE_ENV=production
@@ -41,6 +47,8 @@ COPY tools/ tools/
 RUN bun install --frozen-lockfile \
     && bun install --frozen-lockfile --production
 COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
+COPY --from=data-provider /src/tchat/packages/data-provider/package.json /tmp/data-provider.json
+RUN bun add --production $(bun -e 'const d=require("/tmp/data-provider.json").dependencies ?? {}; console.log(Object.entries(d).map(([n, v]) => `${n}@${v}`).join(" "))')
 
 # --- Runtime ---
 FROM base AS runtime
