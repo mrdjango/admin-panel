@@ -1,3 +1,6 @@
+# Publishes this fork as ghcr.io/<owner>/tchat-admin. The image is built
+# against the Tchat fork's data-provider, so the configuration form renders
+# fork-only fields such as `modelSpecs.imageList`.
 name: Docker Image Publish
 
 on:
@@ -43,7 +46,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/clickhouse/librechat-admin-panel
+          images: ghcr.io/${{ github.repository_owner }}/tchat-admin
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -59,4 +62,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          # Production is amd64; dropping arm64 avoids an emulated leg that
+          # doubles the build for an image nobody runs on arm.
+          platforms: linux/amd64

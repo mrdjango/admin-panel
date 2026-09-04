@@ -1,3 +1,17 @@
+# --- Tchat data-provider ---
+# The configuration form is generated from `configSchema` in
+# librechat-data-provider, so the panel can only edit fields that package
+# declares. Building the Tchat fork's copy over the published one is what makes
+# fork-only config (e.g. `modelSpecs.imageList`) editable here.
+FROM node:24.16.0-alpine AS data-provider
+RUN apk add --no-cache git
+ARG TCHAT_REPO=https://github.com/mrdjango/Tchat.git
+ARG TCHAT_REF=main
+WORKDIR /src
+RUN git clone --depth 1 --branch ${TCHAT_REF} ${TCHAT_REPO} tchat
+WORKDIR /src/tchat/packages/data-provider
+RUN npm install --no-audit --no-fund --loglevel=error && npm run build
+
 # --- Base ---
 FROM oven/bun:1.3.11-alpine AS base
 WORKDIR /app
@@ -12,6 +26,7 @@ RUN bun install --frozen-lockfile
 # --- Build ---
 FROM base AS build
 COPY --from=deps /app/node_modules node_modules
+COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
 COPY . .
 ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=${VITE_BASE_PATH}
@@ -25,6 +40,7 @@ COPY patches/ patches/
 COPY tools/ tools/
 RUN bun install --frozen-lockfile \
     && bun install --frozen-lockfile --production
+COPY --from=data-provider /src/tchat/packages/data-provider/dist node_modules/librechat-data-provider/dist
 
 # --- Runtime ---
 FROM base AS runtime
